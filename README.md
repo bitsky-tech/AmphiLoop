@@ -1,5 +1,7 @@
 # Bridgic Corpus
 
+English | [中文](README-zh.md)
+
 Agent skill & knowledge corpus for the [Bridgic](https://github.com/bitsky-tech) ecosystem — a corpus that provides skills, agents, and commands for building projects powered by LLM-driven and deterministic dual-mode execution.
 
 ## What is Bridgic Corpus?

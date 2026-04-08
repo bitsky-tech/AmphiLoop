@@ -47,6 +47,8 @@ CLI exploration → SDK code generation → verification.
 5. Verify                   (→ amphibious-verify agent)
 ```
 
+> **Path variables**: `{PLUGIN_ROOT}` and `{PROJECT_ROOT}` are the paths below use these prefixes. If either is missing, the plugin was not loaded correctly — do not proceed.
+
 ---
 
 ## Phase 1: Parse Task Input
@@ -79,7 +81,7 @@ Two independent checks — run in order:
 ### 2a. Virtual environment
 
 ```bash
-bash "scripts/run/setup-env.sh"
+bash "{PLUGIN_ROOT}/scripts/run/setup-env.sh"
 ```
 
 Handles: uv check → pyproject.toml creation → `uv sync` → Playwright Chromium install.
@@ -90,7 +92,7 @@ Handles: uv check → pyproject.toml creation → `uv sync` → Playwright Chrom
 ### 2b. Model configuration
 
 ```bash
-bash "scripts/run/check-dotenv.sh"
+bash "{PLUGIN_ROOT}/scripts/run/check-dotenv.sh"
 ```
 
 Validates `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL` are available (from environment variables or `.env` file). Never prints values.
@@ -108,8 +110,8 @@ Capture the `ENV_READY` block from setup-env.sh as the environment details passe
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: Output directory `.bridgic/explore/` (for exploration report and snapshot files), plus environment details from Phase 2
-  - **If Isolated mode**: also pass `user-data-dir` = `.bridgic/explore/browser`. The agent must create this directory and pass `--user-data-dir .bridgic/explore/browser` to all `bridgic-browser` CLI invocations, ensuring exploration runs in a clean browser profile.
+- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, output directory `{PROJECT_ROOT}/.bridgic/explore/` (for exploration report and snapshot files), plus environment details from Phase 2
+  - **If Isolated mode**: also pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/explore/browser`. The agent must create this directory and pass `--user-data-dir {PROJECT_ROOT}/.bridgic/explore/browser` to all `bridgic-browser` CLI invocations, ensuring exploration runs in a clean browser profile.
 
 **Do not proceed to Phase 4 until complete.**
 
@@ -121,14 +123,14 @@ Pass to the agent:
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: Include the exploration report (`.bridgic/explore/exploration_report.md`) and snapshot file paths from Phase 3, plus environment details from Phase 2 (e.g., LLM model, API base)
+- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, the exploration report (`{PROJECT_ROOT}/.bridgic/explore/exploration_report.md`) and snapshot file paths from Phase 3, plus environment details from Phase 2 (e.g., LLM model, API base)
 - **Domain context** (browser automation): Include the following browser-specific instructions in the delegation prompt:
 
 ### Domain Context to Pass
 
 **Domain reference files to read**:
-- `bridgic-browser` skill — `references/sdk-guide.md` and `references/cli-sdk-api-mapping.md` for SDK tool names and usage
-- `commands/references/browser-code-patterns.md` — browser-specific code patterns for all project files
+- `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
+- `{PLUGIN_ROOT}/commands/references/browser-code-patterns.md` — browser-specific code patterns for all project files
 
 **Browser-specific per-file rules** (override or supplement the agent's general rules):
 
@@ -172,12 +174,12 @@ Pass to the agent:
 
 #### helpers.py
 
-- Extraction functions parse live `ctx.observation` at runtime. To **write** these helpers, read the snapshot files in `.bridgic/explore/` (referenced in the exploration report) for the real a11y tree structure. Do not guess the format.
+- Extraction functions parse live `ctx.observation` at runtime. To **write** these helpers, read the snapshot files in `{PROJECT_ROOT}/.bridgic/explore/` (referenced in the exploration report) for the real a11y tree structure. Do not guess the format.
 
 #### main.py
 
 - **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
-  - **If Isolated mode**: set `user_data_dir` to `.bridgic/browser` so the generated project runs in its own clean browser profile.
+  - **If Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser` so the generated project runs in its own clean browser profile.
   - **If Quick mode**: omit `user_data_dir` (use the browser's default profile).
 - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
 - **Tool assembly**: `[*browser_tools, *task_tools]` → pass to `agent.arun(tools=all_tools)`.
@@ -197,5 +199,5 @@ The agent will:
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: Exploration report and snapshot files from `.bridgic/explore/`, plus the work directory of the generated project from Phase 4
-  - **If Isolated mode**: also pass `user-data-dir` = `.bridgic/verify/browser`. The agent must override `user_data_dir` in the debug-instrumented code to this path, ensuring verification runs in a browser profile separate from both exploration and the generated project.
+- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`, plus the work directory of the generated project from Phase 4
+  - **If Isolated mode**: also pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/verify/browser`. The agent must override `user_data_dir` in the debug-instrumented code to this path, ensuring verification runs in a browser profile separate from both exploration and the generated project.

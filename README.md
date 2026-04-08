@@ -132,7 +132,7 @@ bridgic-corpus/
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations
     ├── hook/
-    │   └── inject-plugin-root.sh
+    │   └── inject-command-paths.sh
     └── run/
         ├── setup-env.sh            #   Environment setup (uv, deps, playwright)
         ├── check-dotenv.sh         #   LLM configuration validation

@@ -2,14 +2,14 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Skill",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook/inject-plugin-root.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook/inject-command-paths.sh\""
           }
         ],
-        "description": "Inject BRIDGIC_PLUGIN_ROOT into subagent prompts so they can locate skill files"
+        "description": "Inject PLUGIN_ROOT and PROJECT_ROOT when a bridgic command is loaded"
       }
     ]
   }

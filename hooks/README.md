@@ -20,23 +20,24 @@ Claude Code automatically loads `hooks/hooks.json` from any installed plugin —
 
 | Hook | Matcher | What It Does | Script |
 |------|---------|-------------|--------|
-| **Plugin root injection** | `Agent` | Injects `BRIDGIC_PLUGIN_ROOT` into subagent prompts so they can locate skill files without searching the filesystem | `scripts/hook/inject-plugin-root.sh` |
+| **Command path injection** | `Skill` | Injects `PLUGIN_ROOT` and `PROJECT_ROOT` via stderr when a bridgic command is loaded | `scripts/hook/inject-command-paths.sh` |
 
-### Why Plugin Root Injection?
+### Why Command Path Injection?
 
-Subagents spawned via the Agent tool do **not** inherit the plugin's context — they cannot discover skill files on their own. Without this hook, subagents resort to `find` commands across the home directory, wasting time and risking interference from unrelated files.
+Commands need two resolved paths to locate plugin assets and project output directories. The hook fires only for skills that match a command filename in `commands/*.md`, prints the paths to **stderr** (visible to Claude as context), and the main agent passes them to subagents in delegation prompts.
 
-The hook solves this by appending the plugin root path and file location conventions to the end of the subagent's prompt via `updatedInput`:
+| Variable | Source | Purpose |
+|----------|--------|---------|
+| `PLUGIN_ROOT` | `$CLAUDE_PLUGIN_ROOT` | Locate scripts, skills, and command references within this plugin |
+| `PROJECT_ROOT` | `$PWD` | Locate project output directories (`.bridgic/explore/`, `.bridgic/browser/`, etc.) |
 
 ```
 ---
-BRIDGIC_PLUGIN_ROOT=/absolute/path/to/bridgic
-Skill: {BRIDGIC_PLUGIN_ROOT}/skills/<name>/SKILL.md | references/<file>.md
-Command ref: {BRIDGIC_PLUGIN_ROOT}/commands/references/<file>.md
-Read directly. Do not search.
+PLUGIN_ROOT=/absolute/path/to/bridgic-corpus
+PROJECT_ROOT=/absolute/path/to/user-project
+Use these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PROJECT_ROOT}/.bridgic/...
+---
 ```
-
-This keeps agent and command files focused on methodology — they only declare **what** skills they depend on, not **how** to find them.
 
 ## Adding a New Hook
 

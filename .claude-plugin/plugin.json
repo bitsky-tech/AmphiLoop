@@ -1,6 +1,6 @@
 {
   "name": "bridgic-corpus",
-  "version": "1.0.0.dev4",
+  "version": "1.0.0.dev5",
   "description": "Agent skill & knowledge corpus for the Bridgic ecosystem",
   "agents": [
     "./agents/browser-explorer.md",

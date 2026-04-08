@@ -141,7 +141,7 @@ Record the PID from the output.
 Start monitoring using a script:
 
 ```bash
-bash "${BRIDGIC_PLUGIN_ROOT}/scripts/run/monitor.sh" <PID> .bridgic/verify/run.log .bridgic/verify [TIMEOUT]
+bash "/scripts/run/monitor.sh" <PID> .bridgic/verify/run.log .bridgic/verify [TIMEOUT]
 ```
 
 The script **only returns control to the agent when an actionable event occurs**. The agent reads the exit code and stdout to decide the next action:

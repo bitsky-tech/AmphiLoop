@@ -28,7 +28,7 @@ bridgic-corpus/
 │   └── README.md                      ← hook system documentation
 └── scripts/                           ← hook and utility implementations
     ├── hook/                          ← hook script implementations
-    │   └── inject-plugin-root.sh      ← injects BRIDGIC_PLUGIN_ROOT into subagent prompts
+    │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     └── run/                           ← runtime utility scripts
         ├── setup-env.sh               ← uv + dependencies + playwright setup
         ├── check-dotenv.sh            ← .env LLM configuration validation

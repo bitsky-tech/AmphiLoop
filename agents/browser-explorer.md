@@ -129,7 +129,9 @@ A pseudocode-style operation list. Use indentation and control-flow keywords (`F
 ```
 
 **Rules**:
-- **One line per critical operation** — exclude `snapshot`, `tabs`, `wait`, file reads, and any other observation/timing steps that are implicit in every action cycle
+- **Critical Operation Sequence Record**:
+   - Record only the critical operations needed to achieve the task. Do not include every single CLI command or observation step — focus on the essential interaction chain. Intermediate observations (snapshots, tab checks, file reads) are **not** part of the critical chain
+   - **Do not write `snapshot`, `tabs`, `wait`, `close` operations in pseudocode-style operation list**, file reads, and any other observation/timing steps that are implicit in every action cycle. **Focus on the critical interaction chain and its parameters**.
 - **Behavioral notes as `#` comments**: edge cases, timing notes, component quirks go in trailing comments. When a note is too long for one line, continue on the next line at the same indent with another `#`
 - **Ref and stability inline**: append `[ref=<hex> STABLE|VOLATILE]` after the operation target
 - **Control flow**: use indentation to indicate nesting; use explicit keywords for loops and conditions:

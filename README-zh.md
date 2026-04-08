@@ -132,7 +132,7 @@ bridgic-corpus/
 │   └── hooks.json
 └── scripts/                     # Hook 与工具脚本
     ├── hook/
-    │   └── inject-plugin-root.sh
+    │   └── inject-command-paths.sh
     └── run/
         ├── setup-env.sh            #   环境配置（uv、依赖、playwright）
         ├── check-dotenv.sh         #   LLM 模型配置校验

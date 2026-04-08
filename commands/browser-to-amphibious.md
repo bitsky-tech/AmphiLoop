@@ -55,6 +55,18 @@ Accept the browser task from the user (direct string or file path). Extract:
 - **Target URL(s)**
 - **Goal** — what the automation accomplishes
 - **Expected output** — data to extract or actions to complete
+- **Browser environment mode** — ask the user:
+
+### Browser Environment Mode
+
+> Do you want each pipeline phase to use an **isolated** browser profile, or is **quick** mode (shared default profile) fine?
+
+| Mode | Behavior |
+|------|----------|
+| **Quick** (default) | No `user-data-dir` overrides — all phases share the browser's default profile. Faster, reuses existing cookies/sessions. |
+| **Isolated** | Each phase gets its own `user-data-dir`, ensuring a clean browser state per phase. Useful when login state or cookies from one phase must not leak into another. |
+
+Record the chosen mode — it affects Phases 3, 4, and 5.
 
 Confirm understanding with the user before proceeding.
 
@@ -97,6 +109,7 @@ Capture the `ENV_READY` block from setup-env.sh as the environment details passe
 Pass to the agent:
 - **Task description** from Phase 1
 - **Auxiliary context**: Output directory `.bridgic/explore/` (for exploration report and snapshot files), plus environment details from Phase 2
+  - **If Isolated mode**: also pass `user-data-dir` = `.bridgic/explore/browser`. The agent must create this directory and pass `--user-data-dir .bridgic/explore/browser` to all `bridgic-browser` CLI invocations, ensuring exploration runs in a clean browser profile.
 
 **Do not proceed to Phase 4 until complete.**
 
@@ -163,7 +176,9 @@ Pass to the agent:
 
 #### main.py
 
-- **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context. Set `user_data_dir` to the current working directory with `.bridgic/browser` to preserve session if needed.
+- **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
+  - **If Isolated mode**: set `user_data_dir` to `.bridgic/browser` so the generated project runs in its own clean browser profile.
+  - **If Quick mode**: omit `user_data_dir` (use the browser's default profile).
 - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
 - **Tool assembly**: `[*browser_tools, *task_tools]` → pass to `agent.arun(tools=all_tools)`.
 
@@ -183,3 +198,4 @@ The agent will:
 Pass to the agent:
 - **Task description** from Phase 1
 - **Auxiliary context**: Exploration report and snapshot files from `.bridgic/explore/`, plus the work directory of the generated project from Phase 4
+  - **If Isolated mode**: also pass `user-data-dir` = `.bridgic/verify/browser`. The agent must override `user_data_dir` in the debug-instrumented code to this path, ensuring verification runs in a browser profile separate from both exploration and the generated project.

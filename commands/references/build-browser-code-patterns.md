@@ -1,4 +1,4 @@
-# Code Patterns for Browser-to-Amphibious
+# Code Patterns for Build Browser
 
 ## Table of Contents
 

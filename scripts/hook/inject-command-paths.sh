@@ -34,7 +34,7 @@ if [ -z "$SKILL_NAME" ]; then
   exit 0
 fi
 
-# Strip plugin namespace prefix if present (e.g. "bridgic-corpus:build-browser" → "build-browser")
+# Strip plugin namespace prefix if present (e.g. "AmphiLoop:build-browser" → "build-browser")
 BARE_NAME="${SKILL_NAME##*:}"
 
 # Check if bare skill name matches a command file in this plugin (exact match)

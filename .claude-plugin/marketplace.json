@@ -1,21 +1,21 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "bridgic-corpus",
-  "description": "Agent skill & knowledge corpus for the Bridgic ecosystem — browser automation, dual-mode agents, LLM providers, and end-to-end workflows",
+  "name": "Bridgic",
+  "description": "Agent knowledge corpus for the Bridgic ecosystem.",
   "owner": {
     "name": "Bitsky Tech"
   },
   "plugins": [
     {
-      "name": "bridgic-corpus",
+      "name": "AmphiLoop",
       "source": "./",
       "description": "Skills, agents, and commands for bridgic-browser, bridgic-amphibious, and bridgic-llms",
-      "version": "1.0.0",
+      "version": "1.0.0.dev8",
       "author": {
         "name": "Bitsky Tech"
       },
-      "homepage": "https://github.com/bitsky-tech/bridgic-corpus",
-      "repository": "https://github.com/bitsky-tech/bridgic-corpus",
+      "homepage": "https://github.com/bitsky-tech/AmphiLoop",
+      "repository": "https://github.com/bitsky-tech/AmphiLoop",
       "category": "development",
       "keywords": [
         "browser-automation",

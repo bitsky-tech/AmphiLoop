@@ -33,7 +33,7 @@ Commands need two resolved paths to locate plugin assets and project output dire
 
 ```
 ---
-PLUGIN_ROOT=/absolute/path/to/bridgic-corpus
+PLUGIN_ROOT=/absolute/path/to/AmphiLoop
 PROJECT_ROOT=/absolute/path/to/user-project
 Use these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PROJECT_ROOT}/.bridgic/...
 ---

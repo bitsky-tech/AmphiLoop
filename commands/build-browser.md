@@ -10,7 +10,7 @@ description: >-
   exploration → SDK code generation → verification.
 ---
 
-# Browser-to-Amphibious Pipeline
+# Build Browser Pipeline
 
 Turn a browser task into a working bridgic-amphibious project:
 CLI exploration → SDK code generation → verification.

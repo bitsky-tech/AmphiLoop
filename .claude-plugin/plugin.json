@@ -1,6 +1,6 @@
 {
-  "name": "bridgic-corpus",
-  "version": "1.0.0.dev7",
+  "name": "AmphiLoop",
+  "version": "1.0.0.dev8",
   "description": "Agent skill & knowledge corpus for the Bridgic ecosystem",
   "agents": [
     "./agents/browser-explorer.md",

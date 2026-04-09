@@ -1,12 +1,12 @@
-# Bridgic Corpus
+# AmphiLoop
 
 English | [中文](README-zh.md)
 
 Agent skill & knowledge corpus for the [Bridgic](https://github.com/bitsky-tech) ecosystem — a corpus that provides skills, agents, and commands for building projects powered by LLM-driven and deterministic dual-mode execution.
 
-## What is Bridgic Corpus?
+## What is AmphiLoop?
 
-Bridgic Corpus is a **Corpus** that packages domain knowledge and execution methodology into three layers:
+AmphiLoop is a **Corpus** that packages domain knowledge and execution methodology into three layers:
 
 | Layer | Role | Description |
 |-------|------|-------------|
@@ -22,17 +22,17 @@ Together, they enable an end-to-end pipeline: **explore a website via CLI** -> *
 
 ```bash
 # Step 1: Register the marketplace (one-time)
-claude plugin marketplace add bitsky-tech/bridgic-corpus
+claude plugin marketplace add bitsky-tech/AmphiLoop
 
 # Step 2: Install the plugin
-claude plugin install bridgic-corpus
+claude plugin install AmphiLoop
 ```
 
 Or install directly from a local checkout:
 
 ```bash
-git clone https://github.com/bitsky-tech/bridgic-corpus.git
-claude plugin install /path/to/bridgic-corpus
+git clone https://github.com/bitsky-tech/AmphiLoop.git
+claude plugin install /path/to/AmphiLoop
 ```
 
 After installation, skills, agents, and commands (e.g. `/build-browser`) are automatically available in Claude Code.
@@ -43,10 +43,10 @@ Install individual skills into any supported agent (Claude Code, Cursor, Copilot
 
 ```bash
 # Install a single skill from GitHub
-npx skills add bitsky-tech/bridgic-corpus --skill bridgic-browser
+npx skills add bitsky-tech/AmphiLoop --skill bridgic-browser
 
 # Install all skills at once
-npx skills add bitsky-tech/bridgic-corpus --all
+npx skills add bitsky-tech/AmphiLoop --all
 
 # From a local checkout
 npx skills add . --skill bridgic-browser
@@ -111,7 +111,7 @@ Skills are domain knowledge references that agents and Claude load automatically
 ## Architecture
 
 ```
-bridgic-corpus/
+AmphiLoop/
 ├── .claude-plugin/
 │   └── plugin.json              # Plugin registration
 ├── skills/                      # Domain knowledge (5 skills)

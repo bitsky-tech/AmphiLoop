@@ -1,11 +1,11 @@
-# Bridgic Corpus
+# AmphiLoop
 
 Agent skill & knowledge corpus for the Bridgic ecosystem — providing skills, agents, and commands for building high-quality bridgic projects. Skills cover the foundational specs; commands and agents orchestrate them into end-to-end workflows.
 
 ## Architecture
 
 ```
-bridgic-corpus/
+AmphiLoop/
 ├── CLAUDE.md                          ← this file
 ├── .claude-plugin/
 │   └── plugin.json                    ← Claude Code plugin registration
@@ -47,8 +47,8 @@ bridgic-corpus/
 
 ```bash
 # Register marketplace (one-time), then install
-claude plugin marketplace add bitsky-tech/bridgic-corpus
-claude plugin install bridgic-corpus
+claude plugin marketplace add bitsky-tech/AmphiLoop
+claude plugin install AmphiLoop
 ```
 
 ## Skills

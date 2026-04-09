@@ -35,7 +35,7 @@ git clone https://github.com/bitsky-tech/bridgic-corpus.git
 claude plugin install /path/to/bridgic-corpus
 ```
 
-安装后，skills、agents 和 commands（如 `/browser-to-amphibious`）会自动在 Claude Code 中可用。
+安装后，skills、agents 和 commands（如 `/build-browser`）会自动在 Claude Code 中可用。
 
 ### 方式二：npx skills（单独安装 skills — 支持 40+ 种 Agent 产品）
 
@@ -70,10 +70,10 @@ npx skills add . --skill bridgic-browser
 
 Commands 是用户可直接调用的工作流：
 
-#### `/browser-to-amphibious`
+#### `/build-browser`
 
 ```
-/browser-to-amphibious
+/build-browser
 
 Task: Go to https://example.com, search for "product", and extract the first 5 results
 ```
@@ -125,9 +125,9 @@ bridgic-corpus/
 │   ├── amphibious-generator.md  #   代码生成专家
 │   └── amphibious-verify.md     #   项目验证专家
 ├── commands/                    # 用户可调用的工作流
-│   ├── browser-to-amphibious.md #   端到端流水线
+│   ├── build-browser.md         #   端到端流水线
 │   └── references/
-│       └── browser-code-patterns.md
+│       └── build-browser-code-patterns.md
 ├── hooks/                       # 自动加载的事件处理器
 │   └── hooks.json
 └── scripts/                     # Hook 与工具脚本

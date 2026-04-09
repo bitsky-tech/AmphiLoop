@@ -20,9 +20,9 @@ bridgic-corpus/
 │   ├── amphibious-generator.md        ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
-│   ├── browser-to-amphibious.md       ← /browser-to-amphibious pipeline
+│   ├── build-browser.md               ← /build-browser pipeline
 │   └── references/
-│       └── browser-code-patterns.md   ← browser-specific code patterns
+│       └── build-browser-code-patterns.md ← browser-specific code patterns
 ├── hooks/                             ← auto-loaded by Claude Code
 │   ├── hooks.json                     ← hook definitions
 │   └── README.md                      ← hook system documentation
@@ -41,7 +41,7 @@ bridgic-corpus/
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents | bridgic-basic, bridgic-browser, bridgic-browser-agent, bridgic-amphibious, bridgic-llms |
 | **Agent** | Deep execution methodology — delegated by commands | browser-explorer, amphibious-generator, amphibious-verify |
-| **Command** | Multi-step orchestrator invoked by user | /browser-to-amphibious |
+| **Command** | Multi-step orchestrator invoked by user | /build-browser |
 
 ## Installation
 
@@ -73,4 +73,4 @@ claude plugin install bridgic-corpus
 
 | Command | When to Use |
 |---------|-------------|
-| **/browser-to-amphibious** | Turn a browser task into a working bridgic-amphibious project (parse → explore → generate → verify) |
+| **/build-browser** | Turn a browser task into a working bridgic-amphibious project (parse → explore → generate → verify) |

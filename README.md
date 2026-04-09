@@ -35,7 +35,7 @@ git clone https://github.com/bitsky-tech/bridgic-corpus.git
 claude plugin install /path/to/bridgic-corpus
 ```
 
-After installation, skills, agents, and commands (e.g. `/browser-to-amphibious`) are automatically available in Claude Code.
+After installation, skills, agents, and commands (e.g. `/build-browser`) are automatically available in Claude Code.
 
 ### Option 2: npx skills (individual skills — works with 40+ coding agents)
 
@@ -70,10 +70,10 @@ Available skills for `--skill`:
 
 Commands are user-invocable workflows. Type them directly:
 
-#### `/browser-to-amphibious`
+#### `/build-browser`
 
 ```
-/browser-to-amphibious
+/build-browser
 
 Task: Go to https://example.com, search for "product", and extract the first 5 results
 ```
@@ -125,9 +125,9 @@ bridgic-corpus/
 │   ├── amphibious-generator.md  #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
-│   ├── browser-to-amphibious.md #   End-to-end pipeline
+│   ├── build-browser.md         #   End-to-end pipeline
 │   └── references/
-│       └── browser-code-patterns.md
+│       └── build-browser-code-patterns.md
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations

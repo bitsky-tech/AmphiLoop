@@ -18,7 +18,7 @@ CLI exploration → SDK code generation → verification.
 ## Pipeline Graph
 
 ```
-/browser-to-amphibious (command)
+/build-browser (command)
     │
     ├── runs: setup-env.sh (script)
     │
@@ -31,7 +31,7 @@ CLI exploration → SDK code generation → verification.
     │     │
     │     └── receives domain context from this command:
     │           ├── bridgic-browser (skill)
-    │           └── browser-code-patterns.md
+    │           └── build-browser-code-patterns.md
     │
     └── delegates to: amphibious-verify (agent)
           └── receives domain context: browser verification rules
@@ -130,7 +130,7 @@ Pass to the agent:
 
 **Domain reference files to read**:
 - `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
-- `{PLUGIN_ROOT}/commands/references/browser-code-patterns.md` — browser-specific code patterns for all project files
+- `{PLUGIN_ROOT}/commands/references/build-browser-code-patterns.md` — browser-specific code patterns for all project files
 
 **Browser-specific per-file rules** (override or supplement the agent's general rules):
 
@@ -165,7 +165,7 @@ Pass to the agent:
 
 - **Max snapshot limit**: `observation()` must call `get_snapshot_text(limit=1000000)` to ensure the full snapshot is captured.
 - **Do NOT call `get_snapshot_text` in `on_workflow`** to read page state. The `observation()` hook keeps `ctx.observation` up-to-date — read it directly. The only exception is when `on_workflow` needs a snapshot before hooks have run (e.g., the very first state check after navigation).
-- **`after_action` hook (MUST override)**: refresh `ctx.observation` after `wait_for` completes. Without this, inline code between a `wait_for` yield and the next yield sees stale (pre-wait) page state. See `browser-code-patterns.md` for the mandatory code pattern and optional additional uses.
+- **`after_action` hook (MUST override)**: refresh `ctx.observation` after `wait_for` completes. Without this, inline code between a `wait_for` yield and the next yield sees stale (pre-wait) page state. See `build-browser-code-patterns.md` for the mandatory code pattern and optional additional uses.
 
 #### workers.py
 

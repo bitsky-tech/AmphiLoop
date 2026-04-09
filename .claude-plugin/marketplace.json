@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "Bridgic",
+  "name": "AmphiLoop",
   "description": "Agent knowledge corpus for the Bridgic ecosystem.",
   "owner": {
     "name": "Bitsky Tech"

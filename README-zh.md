@@ -18,8 +18,6 @@ AmphiLoop 是一个**语料库**，将领域知识和执行方法论封装为三
 
 ## 安装
 
-### 方式一：Claude Code 插件（完整体验 — skills + agents + commands）
-
 ```bash
 # 第一步：注册 marketplace（仅需一次）
 claude plugin marketplace add bitsky-tech/AmphiLoop
@@ -36,33 +34,6 @@ claude plugin install /path/to/AmphiLoop
 ```
 
 安装后，skills、agents 和 commands（如 `/build-browser`）会自动在 Claude Code 中可用。
-
-### 方式二：npx skills（单独安装 skills — 支持 40+ 种 Agent 产品）
-
-将 skills 安装到任何支持的 agent 产品中（Claude Code、Cursor、Copilot、Cline 及[更多](https://github.com/vercel-labs/skills)）：
-
-```bash
-# 从 GitHub 安装单个 skill
-npx skills add bitsky-tech/AmphiLoop --skill bridgic-browser
-
-# 一次安装全部 skills
-npx skills add bitsky-tech/AmphiLoop --all
-
-# 从本地仓库安装
-npx skills add . --skill bridgic-browser
-```
-
-可用的 skills：
-
-| 名称 | 描述 |
-|------|------|
-| `bridgic-basic` | Bridgic 核心框架（Worker、Automa、GraphAutoma、ASL） |
-| `bridgic-browser` | 浏览器自动化（CLI 或 Python SDK） |
-| `bridgic-browser-agent` | 浏览器 Agent 模式（OOP + 动态 ref 解析） |
-| `bridgic-amphibious` | 双模 Agent 框架（LLM 驱动 + 确定性执行） |
-| `bridgic-llms` | LLM 提供商集成（OpenAI、OpenAILike、vLLM） |
-
-> **注意：** `npx skills` 方式**仅安装 skills**。如需完整体验（agents、commands、hooks），请使用 Claude Code 插件安装。
 
 ## 使用
 

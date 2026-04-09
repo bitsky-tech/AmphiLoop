@@ -18,8 +18,6 @@ Together, they enable an end-to-end pipeline: **explore a website via CLI** -> *
 
 ## Installation
 
-### Option 1: Claude Code Plugin (full plugin — skills + agents + commands)
-
 ```bash
 # Step 1: Register the marketplace (one-time)
 claude plugin marketplace add bitsky-tech/AmphiLoop
@@ -36,33 +34,6 @@ claude plugin install /path/to/AmphiLoop
 ```
 
 After installation, skills, agents, and commands (e.g. `/build-browser`) are automatically available in Claude Code.
-
-### Option 2: npx skills (individual skills — works with 40+ coding agents)
-
-Install individual skills into any supported agent (Claude Code, Cursor, Copilot, Cline, and [many more](https://github.com/vercel-labs/skills)):
-
-```bash
-# Install a single skill from GitHub
-npx skills add bitsky-tech/AmphiLoop --skill bridgic-browser
-
-# Install all skills at once
-npx skills add bitsky-tech/AmphiLoop --all
-
-# From a local checkout
-npx skills add . --skill bridgic-browser
-```
-
-Available skills for `--skill`:
-
-| Name | Description |
-|------|-------------|
-| `bridgic-basic` | Core Bridgic framework (Worker, Automa, GraphAutoma, ASL) |
-| `bridgic-browser` | Browser automation via CLI or Python SDK |
-| `bridgic-browser-agent` | Browser agent patterns with OOP and dynamic ref resolution |
-| `bridgic-amphibious` | Dual-mode agent framework (LLM-driven + deterministic) |
-| `bridgic-llms` | LLM provider integration (OpenAI, OpenAILike, vLLM) |
-
-> **Note:** The `npx skills` method installs **skills only**. For the full experience (agents, commands, hooks), use the Claude Code plugin install.
 
 ## Usage
 

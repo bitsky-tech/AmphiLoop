@@ -53,8 +53,7 @@ CLI exploration → SDK code generation → verification.
 
 ## Phase 1: Parse Task Input
 
-Accept the browser task from the user (direct string or file path). Extract:
-- **Target URL(s)**
+Accept the browser task from the user (direct string or file path). Extract *Task Description*:
 - **Goal** — what the automation accomplishes
 - **Expected output** — data to extract or actions to complete
 - **Browser environment mode** — ask the user:
@@ -70,7 +69,7 @@ Accept the browser task from the user (direct string or file path). Extract:
 
 Record the chosen mode — it affects Phases 3, 4, and 5.
 
-Confirm understanding with the user before proceeding.
+Confirm understanding with the task before proceeding.
 
 ---
 
@@ -110,8 +109,11 @@ Capture the `ENV_READY` block from setup-env.sh as the environment details passe
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, output directory `{PROJECT_ROOT}/.bridgic/explore/` (for exploration report and snapshot files), plus environment details from Phase 2
-  - **If Isolated mode**: also pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/explore/browser`. The agent must create this directory and pass `--user-data-dir {PROJECT_ROOT}/.bridgic/explore/browser` to all `bridgic-browser` CLI invocations, ensuring exploration runs in a clean browser profile.
+- **Auxiliary context**: 
+  - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
+  - Environment details from Phase 2
+  - **Browser environment mode**: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/explore/browser`
 
 **Do not proceed to Phase 4 until complete.**
 
@@ -123,7 +125,11 @@ Pass to the agent:
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, the exploration report (`{PROJECT_ROOT}/.bridgic/explore/exploration_report.md`) and snapshot file paths from Phase 3, plus environment details from Phase 2 (e.g., LLM model, API base)
+- **Auxiliary context**: 
+  - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 3, 
+  - Plus environment details from Phase 2
+  - **Browser environment mode**: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/running/browser`
 - **Domain context** (browser automation): Include the following browser-specific instructions in the delegation prompt:
 
 ### Domain Context to Pass
@@ -199,5 +205,8 @@ The agent will:
 
 Pass to the agent:
 - **Task description** from Phase 1
-- **Auxiliary context**: `PLUGIN_ROOT` and `PROJECT_ROOT` values, exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`, plus the work directory of the generated project from Phase 4
+- **Auxiliary context**: 
+  - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`
+  - Work directory of the generated project from Phase 4
   - **If Isolated mode**: also pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/verify/browser`. The agent must override `user_data_dir` in the debug-instrumented code to this path, ensuring verification runs in a browser profile separate from both exploration and the generated project.

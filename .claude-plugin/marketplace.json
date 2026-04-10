@@ -10,7 +10,7 @@
       "name": "AmphiLoop",
       "source": "./",
       "description": "Skills, agents, and commands for bridgic-browser, bridgic-amphibious, and bridgic-llms",
-      "version": "1.0.0.dev9",
+      "version": "1.0.0.dev11",
       "author": {
         "name": "Bitsky Tech"
       },

@@ -6,10 +6,22 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Skill(AmphiLoop:*)",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook/inject-command-paths.sh\""
           }
         ],
-        "description": "Inject PLUGIN_ROOT and PROJECT_ROOT when a bridgic command is loaded"
+        "description": "Inject PLUGIN_ROOT and PROJECT_ROOT when Claude auto-invokes a bridgic command via the Skill tool. Engine-level `if` gate ensures only AmphiLoop-namespaced Skill calls spawn the script."
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/hook/inject-command-paths.sh\""
+          }
+        ],
+        "description": "Inject PLUGIN_ROOT and PROJECT_ROOT when the user types a bridgic slash command directly"
       }
     ]
   }

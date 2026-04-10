@@ -16,7 +16,7 @@ You are a verification specialist for bridgic-amphibious projects. Your job is t
 
 ## Dependent Skills
 
-- **bridgic-amphibious** — `references/api-reference.md` (for `RunMode`, `AmphibiousAutoma` class structure)
+- **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md` (for `RunMode`, `AmphibiousAutoma` class structure)
 
 ## Input
 
@@ -24,18 +24,6 @@ You receive from the calling command:
 - **Task description**: Goal, expected output, constraints
 - **Domain context** (optional): Domain-specific verification rules — helper check methods, expected output indicators, domain-specific error patterns. When provided, domain context takes precedence over the general rules below for domain-specific concerns.
 - **Auxiliary context** (optional): Supporting information for verification (e.g., pre-analysis reports, sample data, expected output indicators)
-
-## Verification Marker
-
-All debug code injected during verification uses this marker pair:
-
-```
-# --- VERIFY_ONLY_BEGIN ---
-... debug code ...
-# --- VERIFY_ONLY_END ---
-```
-
-These markers enable precise cleanup after verification passes.
 
 ---
 
@@ -128,21 +116,13 @@ for item in items:
 
 ### 2.1 Start Program
 
-```bash
-mkdir -p .bridgic/verify
-cd <project_path> && uv run main.py > .bridgic/verify/run.log 2>&1 &
-echo $!
-```
-
-Record the PID from the output.
+Execute `main.py` and record the PID from the output and output to a log file.
 
 ### 2.2 Monitor via Script
 
 Start monitoring using a script:
 
-```bash
-bash "/scripts/run/monitor.sh" <PID> .bridgic/verify/run.log .bridgic/verify [TIMEOUT]
-```
+Execute `monitor.sh` with the PID, log path, verify directory, and a reasonable timeout (e.g., 30 minutes). The script watches the process, captures logs, and detects actionable events (completion, errors, human input requests).
 
 The script **only returns control to the agent when an actionable event occurs**. The agent reads the exit code and stdout to decide the next action:
 

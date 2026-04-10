@@ -13,7 +13,7 @@ You are a browser exploration specialist. Your job is to systematically explore 
 
 ## Dependent Skills
 
-- **bridgic-browser skill** — `references/cli-guide.md`
+- **bridgic-browser** — `skills/bridgic-browser/SKILL.md` (Dependencies + installation, CLI guide reference)
 
 ## Input
 

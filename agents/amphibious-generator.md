@@ -15,8 +15,8 @@ You are a bridgic-amphibious code generation specialist. You receive a task desc
 
 ## Dependent Skills
 
-- **bridgic-amphibious** — `references/architecture.md`, `references/patterns.md`, `references/api-reference.md`
-- **bridgic-llms** — `SKILL.md`
+- **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md`
+- **bridgic-llms** — `skills/bridgic-llms/SKILL.md`
 
 ## Input
 
@@ -110,16 +110,3 @@ snapshot = open('.bridgic/explore/snapshot_xxx.txt').read()
 print(extract_items(snapshot))
 "
 ```
-
----
-
-## References
-
-For framework patterns and API details, consult the **bridgic-amphibious** skill references:
-- **Architecture**: `bridgic-amphibious/references/architecture.md` — execution modes, exposure system, memory tiers, cognitive policies
-- **API Reference**: `bridgic-amphibious/references/api-reference.md` — all classes, methods, parameters, types
-- **Patterns**: `bridgic-amphibious/references/patterns.md` — code patterns for all hook types, skills, tracing, filtering
-
-If the calling command provides domain-specific code patterns (via domain context or reference file paths), follow those for domain-specific files (observation hooks, tool setup, main.py resource management).
-
-> **Note**: Full end-to-end verification is handled by the **amphibious-verify** agent. This agent handles code generation and helper validation only.

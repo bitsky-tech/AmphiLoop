@@ -12,23 +12,18 @@ description: |
 
 Model-neutral LLM integration with protocol-driven capability declaration.
 
-## Package Capabilities
-
-Install only the package you need:
+## Dependencies
 
 | Package | `BaseLlm` | `StructuredOutput` | `ToolSelection` |
-|:-------:|:---------:|:------------------:|:---------------:|
-| `bridgic-llms-openai-like` | yes | no | no |
+|---------|:---------:|:------------------:|:---------------:|
 | `bridgic-llms-openai` | yes | yes | yes |
+| `bridgic-llms-openai-like` | yes | no | no |
 | `bridgic-llms-vllm` | yes | yes | yes |
+| `python-dotenv` | — | — | — |
 
-## Installation
+Install only the LLM provider package you need. `python-dotenv` is required for loading `.env` configuration.
 
-```bash
-uv add bridgic-llms-openai        # full capability (recommended)
-uv add bridgic-llms-openai-like   # basic chat/stream only
-uv add bridgic-llms-vllm          # self-hosted vLLM
-```
+**Installation**: Check if the working directory already has a uv environment (`pyproject.toml` exists). If yes, add the missing packages directly. If not, run `uv init` first to initialize the environment, then add them. The agent executing this skill should decide the appropriate steps based on the current environment state.
 
 ## Quick Start
 

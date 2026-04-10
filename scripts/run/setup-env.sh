@@ -1,15 +1,16 @@
 #!/bin/bash
-# setup-env.sh — Python virtual environment setup for bridgic projects.
+# setup-env.sh — Check uv availability and initialize a uv project.
 #
-# Checks uv, creates pyproject.toml from template if absent,
-# installs Python dependencies and browser binaries.
+# 1. Checks if uv is on PATH. If not, prints install instructions and exits 1.
+# 2. Runs `uv init` in the working directory if pyproject.toml is absent.
 #
 # Usage:
 #   setup-env.sh [PROJECT_DIR]   (defaults to current directory)
 #
 # Exit codes:
-#   0  Environment ready
+#   0  uv available and pyproject.toml present
 #   1  uv not installed
+#   2  uv init failed
 
 set -euo pipefail
 
@@ -25,53 +26,20 @@ if ! command -v uv &>/dev/null; then
     exit 1
 fi
 
+echo "uv: $(uv --version 2>&1)"
+
 # ──────────────────────────────────────────────
-# 2. Create pyproject.toml (skip if exists)
+# 2. Initialize uv project (if pyproject.toml is absent)
 # ──────────────────────────────────────────────
 if [ ! -f pyproject.toml ]; then
-    PROJECT_NAME=$(basename "$(pwd)")
-    cat > pyproject.toml <<TOML
-[project]
-name = "${PROJECT_NAME}"
-version = "0.1.0"
-description = "A bridgic automation project"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "bridgic-browser>=0.0.3",
-    "bridgic-core>=0.3.0",
-    "bridgic-llms-openai>=0.1.3",
-    "bridgic-amphibious==0.1.0.dev12",
-    "dotenv>=0.9.9",
-]
-
-[[tool.uv.index]]
-name = "btsk-repo"
-url = "http://8.130.156.165:3141/btsk/test/+simple"
-explicit = true
-
-[tool.uv.sources]
-bridgic-amphibious = { index = "btsk-repo" }
-TOML
+    echo "No pyproject.toml found — running uv init ..."
+    uv init || { echo "Error: uv init failed."; exit 2; }
     echo "Created pyproject.toml"
 else
-    echo "pyproject.toml already exists, skipping"
+    echo "pyproject.toml already exists, skipping init"
 fi
-
-# ──────────────────────────────────────────────
-# 3. Install dependencies
-# ──────────────────────────────────────────────
-echo "Running uv sync..."
-uv sync
-
-# ──────────────────────────────────────────────
-# 4. Install browser binaries
-# ──────────────────────────────────────────────
-echo "Ensuring Playwright Chromium is installed..."
-uv run playwright install chromium
 
 echo ""
 echo "=== ENV_READY ==="
-echo "python: $(uv run python --version 2>&1)"
 echo "uv: $(uv --version 2>&1)"
 echo "project_dir: $(pwd)"

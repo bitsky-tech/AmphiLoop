@@ -23,18 +23,8 @@ CLI exploration → SDK code generation → verification.
     ├── runs: setup-env.sh (script)
     │
     ├── delegates to: browser-explorer (agent)
-    │     └── reads from: bridgic-browser (skill)
-    │
     ├── delegates to: amphibious-generator (agent)
-    │     ├── reads from: bridgic-amphibious (skill)
-    │     ├── reads from: bridgic-llms (skill)
-    │     │
-    │     └── receives domain context from this command:
-    │           ├── bridgic-browser (skill)
-    │           └── build-browser-code-patterns.md
-    │
     └── delegates to: amphibious-verify (agent)
-          └── receives domain context: browser verification rules
 ```
 
 ## Pipeline Workflow
@@ -75,18 +65,20 @@ Confirm understanding with the task before proceeding.
 
 ## Phase 2: Setup Environment
 
-Two independent checks — run in order:
+This phase only checks **`uv` availability** and initializes an **empty uv project** in the working directory. Third-party dependencies are **not** installed here — each subsequent phase is responsible for installing whatever it needs.
 
-### 2a. Virtual environment
+Two checks — run in order:
+
+### 2a. uv environment
 
 ```bash
 bash "{PLUGIN_ROOT}/scripts/run/setup-env.sh"
 ```
 
-Handles: uv check → pyproject.toml creation → `uv sync` → Playwright Chromium install.
+Checks that `uv` is on PATH and runs `uv init` if `pyproject.toml` is absent.
 
-- **Exit 0**: dependencies ready. Capture the `ENV_READY` block from stdout.
-- **Exit 1**: `uv` not installed. Tell the user to install it and stop.
+- **Exit 0**: Capture the `ENV_READY` block from stdout as the environment details passed to later phases.
+- **Exit non-zero**: `uv` is not installed or init failed. Surface the error to the user and **stop the entire pipeline**.
 
 ### 2b. Model configuration
 
@@ -99,7 +91,7 @@ Validates `LLM_API_KEY`, `LLM_API_BASE`, `LLM_MODEL` are available (from environ
 - **Exit 0**: all variables present.
 - **Exit 1**: missing variables listed in output. Ask the user to provide them, then re-run.
 
-Capture the `ENV_READY` block from setup-env.sh as the environment details passed to later phases. Do not proceed until both scripts exit 0.
+Do not proceed until both scripts exit 0.
 
 ---
 

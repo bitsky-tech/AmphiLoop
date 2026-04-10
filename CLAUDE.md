@@ -30,7 +30,7 @@ AmphiLoop/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     └── run/                           ← runtime utility scripts
-        ├── setup-env.sh               ← uv + dependencies + playwright setup
+        ├── setup-env.sh               ← uv availability check + uv init
         ├── check-dotenv.sh            ← .env LLM configuration validation
         └── monitor.sh                 ← process monitor for amphibious-verify agent
 ```

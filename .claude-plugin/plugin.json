@@ -1,6 +1,6 @@
 {
   "name": "AmphiLoop",
-  "version": "1.0.0.dev11",
+  "version": "1.0.0.dev12",
   "description": "Agent skill & knowledge corpus for the Bridgic ecosystem",
   "agents": [],
   "skills": [],

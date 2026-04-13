@@ -15,7 +15,7 @@ A bridgic-amphibious project requires the following packages:
 |---------|-------------|
 | `bridgic-core` | Core framework (Worker, Automa, GraphAutoma, ASL) |
 | `bridgic-amphibious` | Dual-mode agent framework (private index: `http://8.130.156.165:3141/btsk/test/+simple`) |
-| `bridgic-llms-openai` | LLM provider|
+| `bridgic-llms-openai` | LLM provider (only required for `AGENT` / `AMPHIFLOW` modes) |
 | `python-dotenv` | `.env` file loading |
 
 **Installation**: Run the install script to set up all dependencies:
@@ -26,7 +26,7 @@ The script checks uv availability, initializes a uv project if needed, and insta
 
 ## LLM Setup
 
-Amphibious agents require a `BaseLlm` instance with `astructure_output` protocol from a bridgic LLM provider package:
+Amphibious agents accept a `BaseLlm` instance with `astructure_output` protocol from a bridgic LLM provider package. The LLM is required for `AGENT` and `AMPHIFLOW` modes; pure `WORKFLOW` mode can run without one.
 
 ```python
 from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
@@ -91,7 +91,9 @@ Creates: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `skills/
 
 **OTC Cycle:** Observe -> Think -> Act, with hook points at each phase.
 
-**Four RunModes:** `AGENT` (LLM-driven), `WORKFLOW` (deterministic), `AMPHIBIOUS` (workflow + fallback), `AUTO` (auto-detect, default).
+**Four RunModes:** `AGENT` (LLM-driven), `WORKFLOW` (deterministic), `AMPHIFLOW` (workflow + agent fallback), `AUTO` (auto-detect from overridden methods, default).
+
+**`AUTO` resolution:** only `on_agent` overridden → `AGENT`; only `on_workflow` overridden → `WORKFLOW`; both overridden → `AMPHIFLOW`.
 
 ## Key Patterns
 
@@ -110,13 +112,15 @@ class MyAgent(AmphibiousAutoma[CognitiveContext]):
 from bridgic.amphibious import ActionCall
 
 class MyWorkflow(AmphibiousAutoma[CognitiveContext]):
-    async def on_agent(self, ctx): pass
     async def on_workflow(self, ctx):
         result = yield ActionCall("tool_name", arg1="value")
         # result is List[ToolResult]
+
+# Pure workflow mode does not need an LLM.
+await MyWorkflow().arun(goal="...", tools=[...])
 ```
 
-### Amphibious Mode — Workflow with agent fallback
+### Amphiflow Mode — Workflow with agent fallback
 
 ```python
 from bridgic.amphibious import RunMode, AgentCall
@@ -130,7 +134,7 @@ class MyHybrid(AmphibiousAutoma[CognitiveContext]):
 
 await MyHybrid(llm=llm).arun(
     goal="...", tools=[...],
-    mode=RunMode.AMPHIBIOUS, will_fallback=True, max_consecutive_fallbacks=2,
+    mode=RunMode.AMPHIFLOW, will_fallback=True, max_consecutive_fallbacks=2,
 )
 ```
 
@@ -138,7 +142,7 @@ await MyHybrid(llm=llm).arun(
 
 ```python
 from bridgic.amphibious import ActionCall, HumanCall
-from bridgic.amphibious.buildin_tools import human_request_tool
+from bridgic.amphibious.builtin_tools import human_request_tool
 
 class MyAgent(AmphibiousAutoma[CognitiveContext]):
     worker = think_unit(CognitiveWorker.inline("Execute step."), max_attempts=10)

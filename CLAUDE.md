@@ -10,9 +10,9 @@ AmphiLoop/
 ├── .claude-plugin/
 │   └── plugin.json                    ← Claude Code plugin registration
 ├── skills/                            ← domain knowledge: "what it is, how to use it"
-│   ├── bridgic-basic/                 ← core framework (Worker, Automa, GraphAutoma, ASL)
+│   ├── manifest.json                  ← skill source registry (repo, ref, paths)
+│   ├── README.md                      ← manifest docs + auto-generated skill table
 │   ├── bridgic-browser/               ← browser automation CLI + SDK
-│   ├── bridgic-browser-agent/         ← browser agent patterns (OOP + dynamic ref)
 │   ├── bridgic-amphibious/            ← dual-mode agent framework
 │   └── bridgic-llms/                  ← LLM providers and initialization
 ├── agents/                            ← execution methodology: "how to do it well"
@@ -26,20 +26,22 @@ AmphiLoop/
 ├── hooks/                             ← auto-loaded by Claude Code
 │   ├── hooks.json                     ← hook definitions
 │   └── README.md                      ← hook system documentation
-└── scripts/                           ← hook and utility implementations
+└── scripts/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
-    └── run/                           ← runtime utility scripts
-        ├── setup-env.sh               ← auto-install uv + uv init --bare
-        ├── check-dotenv.sh            ← .env LLM configuration validation
-        └── monitor.sh                 ← process monitor for amphibious-verify agent
+    ├── run/                           ← runtime scripts used by agents
+    │   ├── setup-env.sh               ← auto-install uv + uv init --bare
+    │   ├── check-dotenv.sh            ← .env LLM configuration validation
+    │   └── monitor.sh                 ← process monitor for amphibious-verify agent
+    └── maintenance/                   ← plugin maintenance scripts (manual)
+        └── sync-skills.sh             ← sync skills from source repos via manifest.json
 ```
 
 ### Component Roles
 
 | Type | Purpose | Example |
 |------|---------|---------|
-| **Skill** | Domain knowledge reference — loaded on-demand by agents | bridgic-basic, bridgic-browser, bridgic-browser-agent, bridgic-amphibious, bridgic-llms |
+| **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.json` | bridgic-browser, bridgic-amphibious, bridgic-llms |
 | **Agent** | Deep execution methodology — delegated by commands | browser-explorer, amphibious-generator, amphibious-verify |
 | **Command** | Multi-step orchestrator invoked by user | /build-browser |
 
@@ -55,9 +57,7 @@ claude plugin install AmphiLoop
 
 | Skill | When to Use |
 |-------|-------------|
-| **bridgic-basic** | Working with Bridgic core framework (Worker, Automa, GraphAutoma, ASL) |
 | **bridgic-browser** | Browser automation via CLI (`bridgic-browser ...`) or Python SDK (`from bridgic.browser`) |
-| **bridgic-browser-agent** | Building browser automation agents with OOP patterns and dynamic ref resolution |
 | **bridgic-amphibious** | Building dual-mode agents with `AmphibiousAutoma`, `CognitiveWorker`, `on_agent`/`on_workflow` |
 | **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `OpenAILikeLlm`, `VllmServerLlm`), configuring `OpenAIConfiguration` |
 

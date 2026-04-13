@@ -16,7 +16,7 @@ You are a verification specialist for bridgic-amphibious projects. Your job is t
 
 ## Dependent Skills
 
-**IMPORTANT**: You MUST read and load all dependent skills below BEFORE executing any task.
+Before starting, read and load all dependent skills listed below.
 
 - **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md` (for `RunMode`, `AmphibiousAutoma` class structure)
 

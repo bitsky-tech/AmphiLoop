@@ -2,7 +2,7 @@
   "repos": [
     {
       "repo": "bitsky-tech/bridgic-browser",
-      "ref": "v0.0.3",
+      "ref": "hotfix/interactive-snapshot-text-labels",
       "skills": [
         {
           "name": "bridgic-browser",

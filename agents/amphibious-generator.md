@@ -15,6 +15,8 @@ You are a bridgic-amphibious code generation specialist. You receive a task desc
 
 ## Dependent Skills
 
+**IMPORTANT**: You MUST read and load all dependent skills below BEFORE executing any task.
+
 - **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md`
 - **bridgic-llms** — `skills/bridgic-llms/SKILL.md`
 

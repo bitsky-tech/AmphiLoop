@@ -1,12 +1,9 @@
 ---
 description: >-
   End-to-end pipeline that turns a browser automation task into a working
-  bridgic-amphibious project. TRIGGER when the user: (1) provides a browser
-  task and wants to generate an amphibious project from it, (2) says things
-  like "把这个浏览器任务转成代码", "帮我生成自动化项目", "从网页操作生成
-  amphibious 代码", "turn this browser task into code", "generate a project
-  from this browser workflow", or (3) wants to explore a website via CLI and
-  then produce a bridgic-amphibious codebase. The pipeline covers: task
+  bridgic-amphibious project. TRIGGER when the user says like: "provides a browser
+  task and wants to generate an amphibious project from it"; or "generate a project
+  from this browser workflow". The pipeline covers: task
   initialization → pipeline configuration → environment setup → CLI
   exploration → SDK code generation → verification.
 ---
@@ -147,6 +144,10 @@ Pass to the agent:
 
 **Browser-specific per-file rules** (override or supplement the agent's general rules):
 
+#### task.md
+
+- Copy the user's `{PROJECT_ROOT}/TASK.md` content verbatim into the generated project's `task.md`.
+
 #### agents.py
 
 **Element references**
@@ -200,6 +201,7 @@ Pass to the agent:
 - **LLM initialization**:
   - **Amphiflow**: initialize `OpenAILlm` from `.env` / environment variables and pass `llm=llm` to the agent constructor. Set `mode=RunMode.AMPHIBIOUS` in `arun()`.
   - **Workflow**: no LLM needed — pass `llm=None`. Do not set explicit `mode` (defaults to workflow-only behavior).
+- At runtime, read the project's `task.md` file and pass its full content as the `goal` parameter to `agent.arun()`. Load it from `task.md`.
 
 The agent will:
 1. Scaffold the project via `bridgic-amphibious create`

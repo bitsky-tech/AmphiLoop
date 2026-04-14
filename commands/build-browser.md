@@ -45,16 +45,19 @@ If any required section (Goal, Expected Output) is empty, ask the user to comple
 
 ## Phase 2: Configure Pipeline
 
-Ask the user the following configuration questions **in order**, waiting for each answer before proceeding.
+Present the following configuration questions **in order** as numbered choices. The user selects by entering the number (e.g., `1` or `2`). Wait for each answer before proceeding.
 
 ### 2a. Project Mode
 
-> What kind of project do you want to generate — **Workflow** or **Amphiflow**?
+Present the options as:
 
-| Mode | How it works | Best for |
-|------|-------------|----------|
-| **Workflow** | Every browser action is scripted step-by-step — no LLM involved at runtime. | Stable, repeatable tasks where each step is known in advance (form fills, fixed navigation paths, scheduled scraping). |
-| **Amphiflow** | Starts with a deterministic **workflow**, but automatically switches to an LLM-driven `Agent` when unexpected situations arise (element missing, layout changed, CAPTCHA, etc.). Requires LLM configuration. | Tasks that are mostly predictable but may encounter dynamic or unpredictable pages — the agent handles edge cases the workflow can't. |
+> What kind of project do you want to generate?
+>
+> **1. Workflow** — Every browser action is scripted step-by-step, no LLM involved at runtime. Best for stable, repeatable tasks where each step is known in advance (form fills, fixed navigation paths, scheduled scraping).
+>
+> **2. Amphiflow** — Starts with a deterministic workflow, but automatically switches to an LLM-driven Agent when unexpected situations arise (element missing, layout changed, CAPTCHA, etc.). Requires LLM configuration. Best for tasks that are mostly predictable but may encounter dynamic or unpredictable pages.
+>
+> Enter **1** or **2**:
 
 Record the chosen **project mode** — it affects code generation in Phase 5.
 
@@ -67,18 +70,21 @@ bash "{PLUGIN_ROOT}/scripts/run/check-dotenv.sh"
 ```
 
 - **Exit 0**: LLM variables present — proceed.
-- **Exit 1**: missing variables listed in output. Ask the user to set them (via `export` or `.env`), then re-run the script. Do not proceed until it exits 0.
+- **Exit 1**: missing variables listed in output. Create `.env` file and ask the user to set them in it, then re-run the script. Do not proceed until it exits 0.
 
 If the user chose **Workflow**, skip this check entirely — no LLM is needed.
 
 ### 2b. Browser Environment Mode
 
-> Do you want each pipeline phase to use an **isolated** browser profile, or is **default** mode (shared default profile) fine?
+Present the options as:
 
-| Mode | Behavior |
-|------|----------|
-| **Default** (default) | No `user-data-dir` overrides — all phases share a new browser's default profile. |
-| **Isolated** | All phases use `{PROJECT_ROOT}/.bridgic/browser/` as `user-data-dir`. Each phase cleans up this directory when done, so the next phase starts with a fresh browser profile. Useful when you want reproducible runs with no leftover state. |
+> Do you want each pipeline phase to use an isolated browser profile?
+>
+> **1. Default** — No `user-data-dir` overrides. All phases share a new browser's default profile.
+>
+> **2. Isolated** — All phases use `{PROJECT_ROOT}/.bridgic/browser/` as `user-data-dir`. Each phase cleans up this directory when done, so the next phase starts with a fresh browser profile. Useful for reproducible runs with no leftover state.
+>
+> Enter **1** or **2** (default: 1):
 
 Record the chosen **browser mode** — it affects Phases 4, 5, and 6.
 

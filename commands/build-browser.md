@@ -118,7 +118,7 @@ Pass to the agent:
 - **Auxiliary context**: 
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
-  - The `uv` environment is ready (initialized in Phase 3). The agent is responsible for installing its own dependencies based on its dependent skills' requirements.
+  - Please initialize the required execution environment based on the skill.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must create this directory before launching the browser, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up, so that subsequent phases start with a clean browser state.
 
 **Do not proceed to Phase 5 until complete.**
@@ -135,7 +135,7 @@ Pass to the agent:
 - **Auxiliary context**: 
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`
-  - The `uv` environment is ready (initialized in Phase 3). The agent is responsible for installing its own dependencies based on its dependent skills' requirements.
+  - Please initialize the required execution environment based on the skill.
   - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 4
 - **Domain context** (browser automation): Include the following browser-specific instructions in the delegation prompt:
 
@@ -222,7 +222,7 @@ Pass to the agent:
 - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
 - **Auxiliary context**: 
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
-  - The `uv` environment is ready (initialized in Phase 3). The agent is responsible for installing its own dependencies based on its dependent skills' requirements.
+  - Please initialize the required execution environment based on the skill.
   - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`
   - Work directory of the generated project from Phase 5
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must override `user_data_dir` in the debug-instrumented code to this path. After verification is complete and all resources are cleaned up, **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** to leave a clean state.

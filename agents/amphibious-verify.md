@@ -35,7 +35,7 @@ Insert temporary verification instrumentation into the generated code. **Every i
 
 ### 1.1 Force Workflow Mode
 
-Override the `mode` parameter in `main.py`'s `arun()` call to force pure workflow execution. This prevents the amphibious/auto fallback from masking workflow errors — any failure in `on_workflow` will surface immediately instead of silently degrading to agent mode.
+Override the `mode` parameter in `main.py`'s `arun()` as `mode=RunMode.WORKFLOW` call to force pure workflow execution. This prevents the amphibious/auto fallback from masking workflow errors — any failure in `on_workflow` will surface immediately instead of silently degrading to agent mode.
 
 **Where to insert**: In `main.py`, at the `arun()` call site.
 

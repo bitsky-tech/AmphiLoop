@@ -51,11 +51,11 @@ Present the following configuration questions **in order** as numbered choices. 
 
 Present the options as:
 
-> What kind of project do you want to generate?
+> Choose project mode:
 >
-> **1. Workflow** — Every browser action is scripted step-by-step, no LLM involved at runtime. Best for stable, repeatable tasks where each step is known in advance (form fills, fixed navigation paths, scheduled scraping).
+> **1. Workflow** — Pure script, no AI. Every step runs deterministically. Best for stable, predictable tasks.
 >
-> **2. Amphiflow** — Starts with a deterministic workflow, but automatically switches to an LLM-driven Agent when unexpected situations arise (element missing, layout changed, CAPTCHA, etc.). Requires LLM configuration. Best for tasks that are mostly predictable but may encounter dynamic or unpredictable pages.
+> **2. Amphiflow** — Script + AI fallback. Runs the script normally, but switches to AI when something unexpected happens (CAPTCHA, layout change, etc.). Requires LLM config.
 >
 > Enter **1** or **2**:
 
@@ -78,11 +78,11 @@ If the user chose **Workflow**, skip this check entirely — no LLM is needed.
 
 Present the options as:
 
-> Do you want each pipeline phase to use an isolated browser profile?
+> Choose browser environment:
 >
-> **1. Default** — No `user-data-dir` overrides. All phases share a new browser's default profile.
+> **1. Default** — Shared browser state across phases (login sessions carry over).
 >
-> **2. Isolated** — All phases use `{PROJECT_ROOT}/.bridgic/browser/` as `user-data-dir`. Each phase cleans up this directory when done, so the next phase starts with a fresh browser profile. Useful for reproducible runs with no leftover state.
+> **2. Isolated** — Each phase gets a clean browser profile, auto-cleaned after use. Ensures reproducible runs.
 >
 > Enter **1** or **2** (default: 1):
 
@@ -191,6 +191,7 @@ Pass to the agent:
 
 #### main.py
 
+- **Run mode**: set `mode=RunMode.AMPHIBIOUS` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW` if project mode is *Workflow*.
 - **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
   - **If Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` so the generated project runs in its own clean browser profile.
   - **If Default mode**: omit `user_data_dir` (use the browser's default profile).

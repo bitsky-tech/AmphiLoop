@@ -2,7 +2,7 @@
 
 Skills are domain knowledge references loaded on-demand by agents. Each skill directory contains a `SKILL.md` entry point and supporting `references/`, `examples/`, or `scripts/` subdirectories.
 
-Skills are synced from their source repositories using `manifest.json` and the sync script. **Do not manually edit synced files** — they will be overwritten on next sync. Local-only files (listed in `preserve`) are safe.
+Skills are synced from their source repositories using `manifest.ini` and the sync script. **Do not manually edit synced files** — they will be overwritten on next sync. Local-only files (listed in `preserve`) are safe.
 
 ## Skill Sources
 
@@ -15,56 +15,40 @@ Skills are synced from their source repositories using `manifest.json` and the s
 | bridgic-llms | [`bitsky-tech/bridgic`](https://github.com/bitsky-tech/bridgic) | `feature/bridgic-amphibious-scaffolding` | Bridgic is the next-generation agent development framework for building intelligent systems |
 <!-- END SKILL TABLE -->
 
-## manifest.json
+## manifest.ini
 
-The `manifest.json` file defines where each skill comes from. Structure is **repo-centric**: each repo entry has one `ref` (version), and lists the skills to extract from it.
+The `manifest.ini` file defines where each skill comes from. Structure is **skill-centric**: each `[section]` names a skill and declares its source repo, ref, and path. Skills sharing the same repo+ref are downloaded as a single archive.
 
-### Schema
+### Format
 
-```jsonc
-{
-  "repos": [
-    {
-      // GitHub repository in "owner/name" format
-      "repo": "bitsky-tech/bridgic-browser",
+```ini
+# Each [section] is a skill name (= local directory under skills/).
 
-      // Git ref: tag ("v0.0.3"), branch ("main"), or commit SHA ("a1b2c3d")
-      "ref": "v0.0.3",
+[bridgic-browser]
+repo = bitsky-tech/bridgic-browser
+ref  = v0.0.3
+path = skills/bridgic-browser
 
-      // Skills to extract from this repo
-      "skills": [
-        {
-          // Local directory name under skills/
-          "name": "bridgic-browser",
-
-          // Path in the source repo to sync from
-          "source_path": "skills/bridgic-browser",
-
-          // Local paths to keep during sync (not overwritten)
-          // Optional — omit or use [] if nothing to preserve
-          "preserve": ["scripts/"]
-        }
-      ]
-    }
-  ]
-}
+[bridgic-amphibious]
+repo = bitsky-tech/bridgic
+ref  = feature/amphibious-scaffolding
+path = skills/bridgic-amphibious
+preserve = scripts/, local-config.json
 ```
 
 ### Field Reference
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `repos[]` | yes | List of source repositories |
-| `repos[].repo` | yes | GitHub repo, `owner/name` format |
-| `repos[].ref` | yes | Git ref — tag, branch name, or commit SHA |
-| `repos[].skills[]` | yes | Skills to extract from this repo |
-| `repos[].skills[].name` | yes | Local skill directory name (under `skills/`) |
-| `repos[].skills[].source_path` | yes | Directory path in source repo to sync from |
-| `repos[].skills[].preserve` | no | List of local-only paths to preserve during sync |
+| `[section]` | yes | Skill name — becomes the local directory under `skills/` |
+| `repo` | yes | GitHub repo, `owner/name` format |
+| `ref` | yes | Git ref — tag, branch name, or commit SHA |
+| `path` | yes | Directory path in source repo to sync from |
+| `preserve` | no | Comma-separated local paths to keep during sync |
 
 ### Tips
 
-- **One ref per repo**: all skills from the same repo share the same version. When the repo releases a new version, update `ref` once.
+- **Shared repo+ref**: skills from the same repo should use the same `ref`. The sync script downloads each unique repo+ref pair only once.
 - **Branch refs** are useful for tracking unreleased work (e.g., `feature/amphibious-scaffolding`). Switch to a tag once the branch merges and is released.
 - **preserve** protects local files that don't exist in the source repo (e.g., `scripts/install-deps.sh`). Without it, sync deletes everything and replaces with source content.
 

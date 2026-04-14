@@ -1,8 +1,8 @@
 #!/bin/bash
-# sync-skills.sh — Sync skills from source repositories defined in manifest.json.
+# sync-skills.sh — Sync skills from source repositories defined in manifest.ini.
 #
-# Manifest is repo-centric: each repo has a ref (tag/branch) and a list of
-# skills to extract. One tarball download per repo, multiple skills extracted.
+# Manifest is skill-centric: each [section] names a skill and declares its
+# source repo, ref, and path.  Skills sharing a repo+ref are downloaded once.
 #
 # Usage:
 #   sync-skills.sh [OPTIONS] [SKILL_NAME]
@@ -20,13 +20,13 @@
 #   sync-skills.sh --latest            # sync all to latest release
 #   sync-skills.sh --readme            # update skill table in README
 #
-# Requires: curl, tar, python3
+# Requires: curl, tar, python3 (only for --readme and --latest)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-MANIFEST="$PLUGIN_ROOT/skills/manifest.json"
+MANIFEST="$PLUGIN_ROOT/skills/manifest.ini"
 SKILLS_DIR="$PLUGIN_ROOT/skills"
 
 # ── Parse args ───────────────────────────────────────────
@@ -45,10 +45,60 @@ for arg in "$@"; do
     esac
 done
 
-if [ ! -f "$MANIFEST" ]; then
+if [[ ! -f "$MANIFEST" ]]; then
     echo "Error: manifest not found at $MANIFEST"
     exit 1
 fi
+
+# ── INI parser ───────────────────────────────────────────
+# Populates parallel arrays indexed by skill position.
+SKILL_NAMES=()
+SKILL_REPOS=()
+SKILL_REFS=()
+SKILL_PATHS=()
+SKILL_PRESERVES=()
+
+trim() {
+    local s="$1"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
+}
+
+parse_manifest() {
+    local idx=-1
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="$(trim "$line")"
+        [[ -z "$line" ]] && continue
+
+        if [[ "$line" =~ ^\[([^]]+)\]$ ]]; then
+            idx=$(( idx + 1 ))
+            SKILL_NAMES+=("${BASH_REMATCH[1]}")
+            SKILL_REPOS+=("")
+            SKILL_REFS+=("")
+            SKILL_PATHS+=("")
+            SKILL_PRESERVES+=("")
+            continue
+        fi
+
+        (( idx < 0 )) && continue
+
+        if [[ "$line" =~ ^([a-z_]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+            local key="${BASH_REMATCH[1]}"
+            local val
+            val="$(trim "${BASH_REMATCH[2]}")"
+            case "$key" in
+                repo)     SKILL_REPOS[$idx]="$val" ;;
+                ref)      SKILL_REFS[$idx]="$val" ;;
+                path)     SKILL_PATHS[$idx]="$val" ;;
+                preserve) SKILL_PRESERVES[$idx]="$val" ;;
+            esac
+        fi
+    done < "$1"
+}
+
+parse_manifest "$MANIFEST"
 
 # ── GitHub helpers ───────────────────────────────────────
 resolve_latest_tag() {
@@ -65,10 +115,49 @@ download_tarball() {
         "https://api.github.com/repos/${repo}/tarball/${ref}"
 }
 
+# ── Archive cache ────────────────────────────────────────
+# Downloads each repo+ref once; subsequent calls return the cached path.
+CACHE_DIR=$(mktemp -d)
+trap 'rm -rf "$CACHE_DIR"' EXIT
+
+get_archive() {
+    local repo="$1" ref="$2"
+    local key="${repo//\//_}__${ref//\//_}"
+    local marker="$CACHE_DIR/${key}.dir"
+    local fail_marker="$CACHE_DIR/${key}.failed"
+
+    [[ -f "$fail_marker" ]] && return 1
+
+    if [[ -f "$marker" ]]; then
+        cat "$marker"
+        return 0
+    fi
+
+    local tarball="$CACHE_DIR/${key}.tar.gz"
+    local http_code
+    http_code=$(download_tarball "$repo" "$ref" "$tarball")
+
+    if [[ "$http_code" != "200" ]]; then
+        echo "  Error: HTTP $http_code for ${repo}@${ref}" >&2
+        touch "$fail_marker"
+        return 1
+    fi
+
+    local extract_dir="$CACHE_DIR/$key"
+    mkdir -p "$extract_dir"
+    tar -xzf "$tarball" -C "$extract_dir"
+    rm -f "$tarball"
+
+    local top_dir
+    top_dir=$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d ! -name '_*' | head -1)
+    echo "$top_dir" > "$marker"
+    echo "$top_dir"
+}
+
 # ── README table generation ──────────────────────────────
 generate_readme_table() {
     local readme="$SKILLS_DIR/README.md"
-    if [ ! -f "$readme" ]; then
+    if [[ ! -f "$readme" ]]; then
         echo "Error: $readme not found"
         return 1
     fi
@@ -77,10 +166,10 @@ generate_readme_table() {
 
     local table
     table=$(python3 -c "
-import json, sys, urllib.request
+import configparser, json, sys, urllib.request
 
-with open(sys.argv[1]) as f:
-    m = json.load(f)
+c = configparser.ConfigParser()
+c.read(sys.argv[1])
 
 desc_cache = {}
 
@@ -95,7 +184,6 @@ def fetch_description(repo):
             req.add_header('Authorization', f'token {token}')
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            # Take only the first sentence or the English part
             raw = data.get('description') or ''
             desc = raw.split('.')[0].strip().rstrip('.')
             desc_cache[repo] = desc
@@ -108,20 +196,17 @@ rows = [
     '| Skill | Source Repo | Ref | Description |',
     '|-------|------------|-----|-------------|',
 ]
-for r in m['repos']:
-    repo = r['repo']
-    ref = r['ref']
+for skill in c.sections():
+    repo = c[skill]['repo']
+    ref = c[skill]['ref']
     desc = fetch_description(repo)
-    for s in r['skills']:
-        name = s['name']
-        repo_link = f'[\`{repo}\`](https://github.com/{repo})'
-        ref_display = f'\`{ref}\`'
-        rows.append(f'| {name} | {repo_link} | {ref_display} | {desc} |')
+    repo_link = f'[\`{repo}\`](https://github.com/{repo})'
+    ref_display = f'\`{ref}\`'
+    rows.append(f'| {skill} | {repo_link} | {ref_display} | {desc} |')
 
 print('\n'.join(rows))
 " "$MANIFEST")
 
-    # Replace content between markers in README
     python3 -c "
 import sys
 
@@ -153,13 +238,13 @@ fi
 
 # ── Sync one skill from an already-extracted archive ─────
 sync_skill_from_archive() {
-    local name="$1" source_path="$2" preserve_raw="$3" extracted="$4" repo="$5" ref="$6"
+    local name="$1" source_path="$2" preserve_raw="$3" extracted="$4"
     local skill_dir="$SKILLS_DIR/$name"
     local source_dir="$extracted/$source_path"
 
     echo "  ── $name  (${source_path})"
 
-    if [ ! -d "$source_dir" ]; then
+    if [[ ! -d "$source_dir" ]]; then
         echo "     Error: path '$source_path' not found in archive"
         return 1
     fi
@@ -170,8 +255,8 @@ sync_skill_from_archive() {
     if $DRY_RUN; then
         echo "     [dry-run] Files that would be synced:"
         echo "$source_files" | sed 's|^\./|       |'
-        if [ -n "$preserve_raw" ]; then
-            echo "     [dry-run] Preserved local paths: ${preserve_raw//|/, }"
+        if [[ -n "$preserve_raw" ]]; then
+            echo "     [dry-run] Preserved: $preserve_raw"
         fi
         return 0
     fi
@@ -179,26 +264,23 @@ sync_skill_from_archive() {
     # Backup preserved paths
     local backup_dir
     backup_dir=$(mktemp -d)
-    if [ -n "$preserve_raw" ]; then
-        IFS='|' read -ra PRESERVE_PATHS <<< "$preserve_raw"
-        for p in "${PRESERVE_PATHS[@]}"; do
-            [ -z "$p" ] && continue
-            local full_path="$skill_dir/$p"
-            if [ -e "$full_path" ]; then
-                local backup_path="$backup_dir/$p"
-                mkdir -p "$(dirname "$backup_path")"
-                cp -R "$full_path" "$backup_path"
+    if [[ -n "$preserve_raw" ]]; then
+        IFS=',' read -ra PATHS <<< "$preserve_raw"
+        for p in "${PATHS[@]}"; do
+            p="$(trim "$p")"
+            [[ -z "$p" ]] && continue
+            if [[ -e "$skill_dir/$p" ]]; then
+                mkdir -p "$(dirname "$backup_dir/$p")"
+                cp -R "$skill_dir/$p" "$backup_dir/$p"
             fi
         done
     fi
 
-    # Clean target and copy source
     rm -rf "$skill_dir"
     mkdir -p "$skill_dir"
     cp -R "$source_dir"/. "$skill_dir"/
 
-    # Restore preserved paths
-    if [ "$(ls -A "$backup_dir" 2>/dev/null)" ]; then
+    if [[ "$(ls -A "$backup_dir" 2>/dev/null)" ]]; then
         cp -R "$backup_dir"/. "$skill_dir"/
     fi
     rm -rf "$backup_dir"
@@ -206,8 +288,8 @@ sync_skill_from_archive() {
     local file_count
     file_count=$(echo "$source_files" | wc -l | tr -d ' ')
     echo "     Synced $file_count file(s)"
-    if [ -n "$preserve_raw" ]; then
-        echo "     Preserved: ${preserve_raw//|/, }"
+    if [[ -n "$preserve_raw" ]]; then
+        echo "     Preserved: $preserve_raw"
     fi
 }
 
@@ -218,94 +300,86 @@ echo ""
 
 synced=0
 failed=0
+found=false
+last_header=""
 
-# Iterate repos via python3, one JSON line per repo
-python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    m = json.load(f)
-for r in m['repos']:
-    skills = []
-    for s in r['skills']:
-        preserve = '|'.join(s.get('preserve', []))
-        skills.append(f\"{s['name']}\t{s['source_path']}\t{preserve}\")
-    skills_block = '\n'.join(skills)
-    print(f\"{r['repo']}\t{r['ref']}\t{len(r['skills'])}\")
-    print(skills_block)
-" "$MANIFEST" | {
+# Pre-resolve --latest refs (once per unique repo)
+SKILL_ACTUAL_REFS=()
+for ((i = 0; i < ${#SKILL_NAMES[@]}; i++)); do
+    SKILL_ACTUAL_REFS+=("${SKILL_REFS[$i]}")
+done
 
-while IFS=$'\t' read -r repo ref skill_count; do
-    # Check if any skill in this repo matches the target filter
-    skills_data=()
-    has_target=false
-    for ((i = 0; i < skill_count; i++)); do
-        IFS=$'\t' read -r s_name s_path s_preserve
-        skills_data+=("$s_name"$'\t'"$s_path"$'\t'"$s_preserve")
-        if [ -z "$TARGET_SKILL" ] || [ "$s_name" = "$TARGET_SKILL" ]; then
-            has_target=true
+if $USE_LATEST; then
+    for ((i = 0; i < ${#SKILL_NAMES[@]}; i++)); do
+        repo="${SKILL_REPOS[$i]}"
+        resolved=""
+        for ((j = 0; j < i; j++)); do
+            if [[ "${SKILL_REPOS[$j]}" == "$repo" ]]; then
+                resolved="${SKILL_ACTUAL_REFS[$j]}"
+                break
+            fi
+        done
+        if [[ -n "$resolved" ]]; then
+            SKILL_ACTUAL_REFS[$i]="$resolved"
+        else
+            latest=$(resolve_latest_tag "$repo") || true
+            if [[ -n "$latest" ]]; then
+                echo "Resolved $repo latest release: $latest (pinned: ${SKILL_REFS[$i]})"
+                SKILL_ACTUAL_REFS[$i]="$latest"
+            else
+                echo "Warning: no releases for $repo, using pinned: ${SKILL_REFS[$i]}"
+            fi
         fi
     done
+    echo ""
+fi
 
-    if ! $has_target; then
+for ((i = 0; i < ${#SKILL_NAMES[@]}; i++)); do
+    name="${SKILL_NAMES[$i]}"
+    repo="${SKILL_REPOS[$i]}"
+    ref="${SKILL_ACTUAL_REFS[$i]}"
+    src_path="${SKILL_PATHS[$i]}"
+    preserve="${SKILL_PRESERVES[$i]}"
+
+    if [[ -n "$TARGET_SKILL" && "$name" != "$TARGET_SKILL" ]]; then
         continue
     fi
+    found=true
 
-    # Resolve latest if requested
-    actual_ref="$ref"
-    if $USE_LATEST; then
-        latest=$(resolve_latest_tag "$repo") || true
-        if [ -n "$latest" ]; then
-            echo "Resolved $repo latest release: $latest (pinned: $ref)"
-            actual_ref="$latest"
-        else
-            echo "Warning: no releases for $repo, using pinned: $ref"
+    # Print repo header once per repo+ref group
+    header="${repo}@${ref}"
+    new_repo=false
+    if [[ "$header" != "$last_header" ]]; then
+        new_repo=true
+        echo "━━━ ${header} ━━━"
+        last_header="$header"
+    fi
+
+    extracted=$(get_archive "$repo" "$ref") || {
+        if $new_repo; then
+            echo "  Error: download failed. Check repo/ref."
+            echo ""
         fi
-    fi
-
-    echo "━━━ ${repo}@${actual_ref} ━━━"
-
-    # Download tarball once per repo
-    tmpdir=$(mktemp -d)
-    tarball="$tmpdir/archive.tar.gz"
-    http_code=$(download_tarball "$repo" "$actual_ref" "$tarball")
-
-    if [ "$http_code" != "200" ]; then
-        echo "  Error: download failed (HTTP $http_code). Check repo/ref."
-        rm -rf "$tmpdir"
-        failed=$((failed + skill_count))
+        failed=$((failed + 1))
         continue
-    fi
+    }
 
-    if ! $DRY_RUN; then
+    if $new_repo && ! $DRY_RUN; then
         echo "  Downloaded archive"
     fi
 
-    # Extract once
-    tar -xzf "$tarball" -C "$tmpdir"
-    extracted=$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d ! -name '_*' | head -1)
-
-    # Sync each skill from this repo
-    for entry in "${skills_data[@]}"; do
-        IFS=$'\t' read -r s_name s_path s_preserve <<< "$entry"
-        if [ -n "$TARGET_SKILL" ] && [ "$s_name" != "$TARGET_SKILL" ]; then
-            continue
-        fi
-        if sync_skill_from_archive "$s_name" "$s_path" "$s_preserve" "$extracted" "$repo" "$actual_ref"; then
-            synced=$((synced + 1))
-        else
-            failed=$((failed + 1))
-        fi
-    done
-
-    rm -rf "$tmpdir"
-    echo ""
+    if sync_skill_from_archive "$name" "$src_path" "$preserve" "$extracted"; then
+        synced=$((synced + 1))
+    else
+        failed=$((failed + 1))
+    fi
 done
 
-if [ "$synced" -eq 0 ] && [ "$failed" -eq 0 ] && [ -n "$TARGET_SKILL" ]; then
+echo ""
+
+if ! $found && [[ -n "$TARGET_SKILL" ]]; then
     echo "Error: skill '$TARGET_SKILL' not found in manifest"
     exit 1
 fi
 
 echo "=== SYNC COMPLETE: $synced succeeded, $failed failed ==="
-
-}

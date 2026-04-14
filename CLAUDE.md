@@ -10,7 +10,7 @@ AmphiLoop/
 ├── .claude-plugin/
 │   └── plugin.json                    ← Claude Code plugin registration
 ├── skills/                            ← domain knowledge: "what it is, how to use it"
-│   ├── manifest.json                  ← skill source registry (repo, ref, paths)
+│   ├── manifest.ini                  ← skill source registry (repo, ref, paths)
 │   ├── README.md                      ← manifest docs + auto-generated skill table
 │   ├── bridgic-browser/               ← browser automation CLI + SDK
 │   ├── bridgic-amphibious/            ← dual-mode agent framework
@@ -34,14 +34,14 @@ AmphiLoop/
     │   ├── check-dotenv.sh            ← .env LLM configuration validation
     │   └── monitor.sh                 ← process monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)
-        └── sync-skills.sh             ← sync skills from source repos via manifest.json
+        └── sync-skills.sh             ← sync skills from source repos via manifest.ini
 ```
 
 ### Component Roles
 
 | Type | Purpose | Example |
 |------|---------|---------|
-| **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.json` | bridgic-browser, bridgic-amphibious, bridgic-llms |
+| **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
 | **Agent** | Deep execution methodology — delegated by commands | browser-explorer, amphibious-generator, amphibious-verify |
 | **Command** | Multi-step orchestrator invoked by user | /build-browser |
 

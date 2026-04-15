@@ -133,6 +133,13 @@ AmphiLoop/
   +-----------+
 ```
 
+### 社区
+
+欢迎加入我们，反馈建议、交流问题、获取最新动态：
+
+- 🐦 Twitter / X：[@bridgic](https://x.com/bridgic)
+- 💬 Discord：[加入我们的服务器](https://discord.gg/4NyKjXGKEh)
+
 ## 许可证
 
 详见 [LICENSE](LICENSE)。

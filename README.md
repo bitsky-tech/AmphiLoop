@@ -132,6 +132,12 @@ User invokes command
   |   Hooks   |  (inject plugin context into subagent prompts)
   +-----------+
 ```
+### Community
+
+Join us to share feedback, ask questions, and keep up with what's new:
+
+- 🐦 Twitter / X: [@bridgic](https://x.com/bridgic)
+- 💬 Discord: [Join our server](https://discord.gg/4NyKjXGKEh)
 
 ## License
 

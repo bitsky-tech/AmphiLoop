@@ -22,8 +22,8 @@ set -euo pipefail
 PID="${1:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
 LOG_FILE="${2:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
 VERIFY_DIR="${3:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
-MAX_TIMEOUT=600
-TIMEOUT="${4:-600}"
+MAX_TIMEOUT=300
+TIMEOUT="${4:-300}"
 if [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ]; then
     TIMEOUT="$MAX_TIMEOUT"
 fi

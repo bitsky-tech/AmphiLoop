@@ -1,6 +1,6 @@
 {
   "name": "AmphiLoop",
-  "version": "1.0.0.dev15",
+  "version": "1.0.0",
   "description": "Agent skill & knowledge corpus for the Bridgic ecosystem",
   "commands": [
     "./commands/"

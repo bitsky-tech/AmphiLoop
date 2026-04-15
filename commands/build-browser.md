@@ -58,9 +58,9 @@ Present the options as:
 
 Record the chosen **project mode** — it affects code generation in Phase 5.
 
-#### LLM configuration (Amphiflow only)
+#### LLM configuration
 
-If the user chose **Amphiflow**, immediately validate LLM configuration:
+**If the user chose Amphiflow**, immediately validate LLM configuration:
 
 ```bash
 bash "{PLUGIN_ROOT}/scripts/run/check-dotenv.sh"
@@ -69,7 +69,23 @@ bash "{PLUGIN_ROOT}/scripts/run/check-dotenv.sh"
 - **Exit 0**: LLM variables present — proceed.
 - **Exit 1**: missing variables listed in output. Create `.env` file and ask the user to set them in it, then re-run the script. Do not proceed until it exits 0.
 
-If the user chose **Workflow**, skip this check entirely — no LLM is needed.
+**If the user chose Workflow**, analyze the task description from TASK.md to determine whether LLM is still needed:
+
+1. **Task clearly requires LLM** — The task description contains explicit AI/model demands such as: intelligent summarization, AI-based classification, natural language generation, semantic analysis, content understanding that cannot be achieved with deterministic rules, or the user explicitly mentions using AI/LLM/model. In this case, inform the user that their task involves AI-powered operations and LLM configuration is needed, then run the same `.env` validation check above. Do not ask — proceed directly.
+
+2. **Task is ambiguous** — The task description contains operations that *could* involve AI but are not explicitly stated (e.g., "extract key information", "analyze content", "generate a report"). Present the question:
+
+   > Your task description mentions operations that may benefit from AI/LLM capabilities (e.g., content analysis, intelligent extraction). Would you like to configure an LLM?
+   >
+   > **1. Yes** — Configure LLM for AI-powered processing.
+   >
+   > **2. No** — Run purely with deterministic scripts, no AI.
+   >
+   > Enter **1** or **2**:
+
+   If the user chose **1**, run the `.env` validation check above. If **2**, skip.
+
+3. **Task clearly does not require LLM** — The task is purely mechanical (page navigation, clicking, form-filling, data scraping with fixed selectors, file download). Skip LLM configuration entirely.
 
 ### 2b. Browser Environment Mode
 
@@ -131,6 +147,7 @@ Pass to the agent:
 - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
 - **Auxiliary context**: 
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - **LLM configured** from Phase 2 — whether LLM environment was validated (yes/no). 
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`
   - Please initialize the required execution environment based on the skill.
   - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 4
@@ -149,6 +166,11 @@ Pass to the agent:
 - Copy the user's `{PROJECT_ROOT}/TASK.md` content verbatim into the generated project's `task.md`.
 
 #### agents.py
+
+**Project mode affects code generation**
+
+- **Workflow mode**: Generate only `on_workflow` with deterministic step-by-step actions with: `ActionCall`, `AgentCall` (with LLM configured = yes), and `HumanCall`.
+- **Amphiflow mode**: Generate both `on_workflow` (primary path) and `on_agent` (final fallback handler).
 
 **Element references**
 
@@ -192,25 +214,21 @@ Pass to the agent:
 
 #### main.py
 
-- **Run mode**: set `mode=RunMode.AMPHIBIOUS` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW` if project mode is *Workflow*.
+- **Run mode**: set `mode=RunMode.AMPHIFLOW` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW` if project mode is *Workflow*.
 - **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
   - **If Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` so the generated project runs in its own clean browser profile.
   - **If Default mode**: omit `user_data_dir` (use the browser's default profile).
 - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
 - **Tool assembly**: `[*browser_tools, *task_tools]` → pass to `agent.arun(tools=all_tools)`.
-- **LLM initialization**:
-  - **Amphiflow**: initialize `OpenAILlm` from `.env` / environment variables and pass `llm=llm` to the agent constructor. Set `mode=RunMode.AMPHIBIOUS` in `arun()`.
-  - **Workflow**: no LLM needed — pass `llm=None`. Do not set explicit `mode` (defaults to workflow-only behavior).
+- **LLM initialization** (based on the **LLM configured** flag from Phase 2, not the project mode):
+  - **LLM configured = yes** : initialize `OpenAILlm` from `.env` / environment variables and pass `llm=llm` to the agent constructor.
+  - **LLM configured = no** : pass `llm=None` to the agent constructor. Do not import or initialize any LLM classes.
 - At runtime, read the project's `task.md` file and pass its full content as the `goal` parameter to `agent.arun()`. Load it from `task.md`.
 
 The agent will:
 1. Scaffold the project via `bridgic-amphibious create`
 2. Load framework references from `bridgic-amphibious` skill + browser domain references from above
 3. Complete all project files based on the scaffold created by `bridgic-amphibious create`
-
-**Project mode affects code generation:**
-- **Workflow**: Generate only `on_workflow` with deterministic step-by-step actions. Leave `on_agent` as a no-op (`pass`). Run with default `RunMode` (no explicit mode parameter needed).
-- **Amphiflow**: Generate both `on_workflow` (primary path) and `on_agent` (fallback handler). Run with `mode=RunMode.AMPHIBIOUS`.
 
 **Proceed directly to Phase 6**. Code quality issues are the sole responsibility of the amphibious-verify agent — it will run the project, detect errors from actual execution, and fix them with proper diagnosis.
 

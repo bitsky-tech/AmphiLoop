@@ -22,7 +22,8 @@ AmphiLoop/
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
 │   └── build-browser.md               ← /build-browser pipeline
 ├── examples/                          ← static example docs (not auto-scanned by Claude Code)
-│   └── build-browser-code-patterns.md ← browser-specific code patterns
+│   ├── build-browser-code-patterns.md ← browser-specific code patterns
+│   └── build-browser-task-template.md ← TASK.md template for /build-browser Phase 1
 ├── hooks/                             ← auto-loaded by Claude Code
 │   ├── hooks.json                     ← hook definitions
 │   └── README.md                      ← hook system documentation

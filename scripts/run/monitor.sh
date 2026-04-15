@@ -22,7 +22,11 @@ set -euo pipefail
 PID="${1:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
 LOG_FILE="${2:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
 VERIFY_DIR="${3:?Usage: monitor.sh <PID> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]}"
-TIMEOUT="${4:-300}"
+MAX_TIMEOUT=600
+TIMEOUT="${4:-600}"
+if [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ]; then
+    TIMEOUT="$MAX_TIMEOUT"
+fi
 
 POLL_INTERVAL=3
 START_TIME=$(date +%s)

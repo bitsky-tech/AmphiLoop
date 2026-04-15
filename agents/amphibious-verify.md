@@ -124,7 +124,7 @@ Execute `main.py` and record the PID from the output and output to a log file.
 
 Start monitoring using a script:
 
-Execute `monitor.sh` with the PID, log path, verify directory, and a reasonable timeout (e.g., 30 minutes). The script watches the process, captures logs, and detects actionable events (completion, errors, human input requests).
+Execute `monitor.sh` with the PID, log path, verify directory, and a timeout. The timeout must not exceed **10 minutes (600 seconds), best is within 5 minutes (300 seconds)** — verification runs are time-boxed to keep the feedback loop short. The script watches the process, captures logs, and detects actionable events (completion, errors, human input requests).
 
 The script **only returns control to the agent when an actionable event occurs**. The agent reads the exit code and stdout to decide the next action:
 

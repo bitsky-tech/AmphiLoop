@@ -29,7 +29,7 @@ Turn a browser task into a working bridgic-amphibious project.
 
 ## Phase 1: Initialize Task
 
-Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/examples/build-browser-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill in it. 
+Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/examples/build-browser-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill in it.
 
 Wait for the user to confirm they have filled in the template. Then read `{PROJECT_ROOT}/TASK.md` and extract the *Task Description*:
 - Goal
@@ -42,7 +42,7 @@ If any required section (Goal, Expected Output) is empty, ask the user to comple
 
 ## Phase 2: Configure Pipeline
 
-Present the following configuration questions **in order** as numbered choices. The user selects by entering the number (e.g., `1` or `2`). Wait for each answer before proceeding.
+Present the following configuration questions **in order** as numbered choices. The user selects by entering the number (e.g., `1` or `2`). Wait for each answer before proceeding. All interactions with user to confirm use `AskUserQuestion` tool to present the question and capture the answer.
 
 ### 2a. Project Mode
 
@@ -54,7 +54,6 @@ Present the options as:
 >
 > **2. Amphiflow** — Script + AI fallback. Runs the script normally, but switches to AI when something unexpected happens (CAPTCHA, layout change, etc.). Requires LLM config.
 >
-> Enter **1** or **2**:
 
 Record the chosen **project mode** — it affects code generation in Phase 5.
 
@@ -128,7 +127,7 @@ Do not proceed until the script exits 0.
 
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)
-- **Auxiliary context**: 
+- **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
   - Please initialize the required execution environment based on the skill.
@@ -145,9 +144,9 @@ Pass to the agent:
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)
 - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
-- **Auxiliary context**: 
+- **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
-  - **LLM configured** from Phase 2 — whether LLM environment was validated (yes/no). 
+  - **LLM configured** from Phase 2 — whether LLM environment was validated (yes/no).
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`
   - Please initialize the required execution environment based on the skill.
   - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 4
@@ -241,7 +240,7 @@ The agent will:
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)
 - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
-- **Auxiliary context**: 
+- **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Please initialize the required execution environment based on the skill.
   - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`

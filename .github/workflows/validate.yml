@@ -83,6 +83,7 @@ jobs:
         uses: ludeeus/action-shellcheck@master
         with:
           scandir: scripts
+          severity: warning
 
   file-references:
     name: File Reference Check

@@ -132,6 +132,7 @@ User invokes command
   |   Hooks   |  (inject plugin context into subagent prompts)
   +-----------+
 ```
+
 ### Community
 
 Join us to share feedback, ask questions, and keep up with what's new:

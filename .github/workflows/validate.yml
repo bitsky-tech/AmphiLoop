@@ -1,0 +1,167 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  manifest-check:
+    name: Manifest & Skill Integrity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse manifest.ini
+        run: |
+          python3 -c "
+          import configparser, sys, os
+
+          c = configparser.ConfigParser()
+          c.read('skills/manifest.ini')
+
+          if not c.sections():
+              print('Error: manifest.ini has no skill sections')
+              sys.exit(1)
+
+          errors = []
+          for skill in c.sections():
+              for key in ('repo', 'ref', 'path'):
+                  if key not in c[skill]:
+                      errors.append(f'[{skill}] missing required field: {key}')
+
+              skill_dir = os.path.join('skills', skill)
+              if not os.path.isdir(skill_dir):
+                  errors.append(f'[{skill}] local directory not found: {skill_dir}')
+
+          if errors:
+              for e in errors:
+                  print(f'Error: {e}')
+              sys.exit(1)
+
+          print(f'Manifest OK: {len(c.sections())} skill(s) validated')
+          "
+
+      - name: Check skill sync status
+        run: |
+          bash scripts/maintenance/sync-skills.sh --check
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          config: .github/.markdownlint.yaml
+          globs: |
+            **/*.md
+            !skills/**/*.md
+            !node_modules/**
+
+  shellcheck:
+    name: Shell Script Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: scripts
+
+  file-references:
+    name: File Reference Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check internal file references
+        run: |
+          errors=0
+
+          # Check that files referenced in CLAUDE.md exist
+          # Extract paths like: ├── filename or └── filename patterns are structure, skip those
+          # Check markdown links to local files: [text](path)
+          while IFS= read -r file; do
+            grep -oP '\[.*?\]\((?!https?://|#)([^)]+)\)' "$file" | \
+              grep -oP '\(([^)]+)\)' | tr -d '()' | while read -r ref; do
+                # Strip anchor fragments
+                ref="${ref%%#*}"
+                [ -z "$ref" ] && continue
+
+                # Resolve relative to the file's directory
+                dir="$(dirname "$file")"
+                target="$dir/$ref"
+
+                if [ ! -e "$target" ]; then
+                  echo "Broken link in $file -> $ref"
+                  errors=$((errors + 1))
+                fi
+              done
+          done < <(find . -name '*.md' -not -path './skills/*' -not -path './.git/*' -not -path './node_modules/*')
+
+          # Use a summary file to propagate error count from subshells
+          # Re-run with error collection
+          broken=$(find . -name '*.md' -not -path './skills/*' -not -path './.git/*' -not -path './node_modules/*' -exec \
+            grep -lP '\[.*?\]\((?!https?://|#)([^)]+)\)' {} \; 2>/dev/null | while read -r file; do
+              grep -oP '\[.*?\]\((?!https?://|#)([^)]+)\)' "$file" | \
+                grep -oP '\(([^)]+)\)' | tr -d '()' | while read -r ref; do
+                  ref="${ref%%#*}"
+                  [ -z "$ref" ] && continue
+                  dir="$(dirname "$file")"
+                  target="$dir/$ref"
+                  if [ ! -e "$target" ]; then
+                    echo "BROKEN: $file -> $ref"
+                  fi
+                done
+            done)
+
+          if [ -n "$broken" ]; then
+            echo "$broken"
+            echo ""
+            echo "Found broken file references"
+            exit 1
+          else
+            echo "All file references OK"
+          fi
+
+  validate-summary:
+    name: Validate Summary
+    runs-on: ubuntu-latest
+    needs: [manifest-check, markdown-lint, shellcheck, file-references]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "Manifest check: ${{ needs.manifest-check.result }}"
+          echo "Markdown lint:  ${{ needs.markdown-lint.result }}"
+          echo "ShellCheck:     ${{ needs.shellcheck.result }}"
+          echo "File refs:      ${{ needs.file-references.result }}"
+
+          if [[ "${{ needs.manifest-check.result }}" != "success" ]] || \
+             [[ "${{ needs.markdown-lint.result }}" != "success" ]] || \
+             [[ "${{ needs.shellcheck.result }}" != "success" ]] || \
+             [[ "${{ needs.file-references.result }}" != "success" ]]; then
+            echo "Some checks failed"
+            exit 1
+          else
+            echo "All checks passed"
+          fi

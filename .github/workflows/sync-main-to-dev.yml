@@ -1,0 +1,74 @@
+name: Sync main to dev
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual sync (optional, for audit trail)'
+        required: false
+        default: 'Manual sync requested'
+
+permissions:
+  contents: write
+
+jobs:
+  merge:
+    # For PR events: only run if merged and from release/* branch
+    # For manual dispatch: always run
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate GitHub App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.CI_BOT_APP_ID }}
+          private_key: ${{ secrets.CI_BOT_APP_PRIVATE_KEY }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "bitsky-ci[bot]"
+          git config user.email "bitsky-ci[bot]@users.noreply.github.com"
+
+      - name: Sync main to dev
+        run: |
+          git fetch origin dev main
+          git checkout dev
+
+          # Check if dev is already up to date with main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "All commits from main are already in dev branch."
+            exit 0
+          fi
+
+          # Determine commit message based on trigger type
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            COMMIT_MSG="Sync: manual merge main to dev"
+          else
+            COMMIT_MSG="Sync: auto merge main after merging ${{ github.event.pull_request.head.ref }}"
+          fi
+
+          # Perform merge
+          echo "Merging main into dev..."
+          git merge origin/main -m "$COMMIT_MSG"
+          echo "Merge successful"
+
+          # Push changes
+          git push origin dev
+          echo "Successfully synced main to dev"
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}

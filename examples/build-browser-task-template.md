@@ -19,11 +19,13 @@
 order_details.csv and a summary printed to the console.
 -->
 
-## Notes (optional)
-<!-- Any additional context: login requirements, special timing, multi-step flows, known quirks of the target site, pagination needs, etc. -->
+## Notes
+<!-- This section is optional. -->
+<!-- Any additional context: login requirements, special timing, parameter requirements, multi-step flows, known quirks of the target site, pagination needs, etc. -->
 
 <!-- Example:
 - If the site requires WeChat Pay merchant login — human intervention is needed for the login step.
 - Date filters are relative ("past week"), so the automation must compute dates dynamically at runtime.
 - There may be multiple pages of results; all pages must be processed.
+- Whether to use a headed browser should be a parameter of the generated program.
 -->

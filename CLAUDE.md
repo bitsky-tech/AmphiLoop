@@ -25,8 +25,7 @@ AmphiLoop/
 │   ├── build-browser-code-patterns.md ← browser-specific code patterns
 │   └── build-browser-task-template.md ← TASK.md template for /build-browser Phase 1
 ├── hooks/                             ← auto-loaded by Claude Code
-│   ├── hooks.json                     ← hook definitions
-│   └── README.md                      ← hook system documentation
+│   └── hooks.json                     ← hook definitions
 └── scripts/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads

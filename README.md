@@ -39,15 +39,22 @@ After installation, skills, agents, and commands (e.g. `/build-browser`) are aut
 
 ### Commands
 
-Commands are user-invocable workflows. Type them directly:
+Commands are user-invocable workflows. Invoke them with the `/` prefix:
 
-#### `/build-browser`
+#### `/AmphiLoop:build-browser`
+
+Describe a browser automation task and ask to generate a stable, runnable project:
 
 ```
-/build-browser
+/AmphiLoop:build-browser
 
-Task: Go to https://example.com, search for "product", and extract the first 5 results
+Go to https://example.com, search for "product", and extract the first 5 results.
+I want a project that can run this reliably.
 ```
+
+Your input should contain two key intents:
+1. **A browser automation task** — what to do on the target website (navigate, click, extract, etc.)
+2. **A request to generate a stable project** — you want a working program/project that can run reliably
 
 **What happens under the hood:**
 
@@ -73,9 +80,7 @@ Skills are domain knowledge references that agents and Claude load automatically
 
 | Skill | Activates When |
 |-------|---------------|
-| **bridgic-basic** | Working with Bridgic core framework (Worker, Automa, GraphAutoma, ASL) |
 | **bridgic-browser** | Using browser automation via CLI (`bridgic-browser ...`) or Python SDK (`from bridgic.browser`) |
-| **bridgic-browser-agent** | Building browser automation agents with OOP patterns and dynamic ref resolution |
 | **bridgic-amphibious** | Building dual-mode agents with `AmphibiousAutoma`, `CognitiveWorker`, `on_agent`/`on_workflow` |
 | **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `OpenAILikeLlm`, `VllmServerLlm`) |
 
@@ -84,11 +89,12 @@ Skills are domain knowledge references that agents and Claude load automatically
 ```
 AmphiLoop/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin registration
-├── skills/                      # Domain knowledge (5 skills)
-│   ├── bridgic-basic/           #   Core framework concepts
+│   ├── plugin.json              # Plugin registration
+│   └── marketplace.json         # Marketplace metadata
+├── skills/                      # Domain knowledge (3 skills)
+│   ├── manifest.ini             #   Skill source registry (repo, ref, paths)
+│   ├── README.md                #   Manifest docs + auto-generated skill table
 │   ├── bridgic-browser/         #   Browser automation CLI + SDK
-│   ├── bridgic-browser-agent/   #   Browser agent patterns
 │   ├── bridgic-amphibious/      #   Dual-mode agent framework
 │   └── bridgic-llms/            #   LLM provider integration
 ├── agents/                      # Execution methodology (3 agents)
@@ -98,16 +104,19 @@ AmphiLoop/
 ├── commands/                    # User-invocable workflows
 │   └── build-browser.md         #   End-to-end pipeline
 ├── examples/                    # Static example docs (not auto-scanned)
-│   └── build-browser-code-patterns.md
+│   ├── build-browser-code-patterns.md
+│   └── build-browser-task-template.md
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations
     ├── hook/
     │   └── inject-command-paths.sh
-    └── run/
-        ├── setup-env.sh            #   Environment setup (uv, deps, playwright)
-        ├── check-dotenv.sh         #   LLM configuration validation
-        └── monitor.sh
+    ├── run/
+    │   ├── setup-env.sh         #   Environment setup (uv, deps, playwright)
+    │   ├── check-dotenv.sh      #   LLM configuration validation
+    │   └── monitor.sh
+    └── maintenance/
+        └── sync-skills.sh       #   Sync skills from source repos via manifest.ini
 ```
 
 ### How the Layers Connect

@@ -2,11 +2,9 @@
 
 English | [中文](README-zh.md)
 
-Agent skill & knowledge corpus for the [Bridgic](https://github.com/bitsky-tech) ecosystem — a corpus that provides skills, agents, and commands for building projects powered by LLM-driven and deterministic dual-mode execution.
+AmphiLoop, short for Amphibious Loop, is a new methodology, technology stack, and toolchain for building AI agents. It enables tasks to be described and orchestrated using natural language, with an “Explore → Code → Verify” loop guiding code generation and build. The resulting artifacts are capable of automatically switching between workflow mode and agent mode at runtime.
 
-## What is AmphiLoop?
-
-AmphiLoop is a **Corpus** that packages domain knowledge and execution methodology into three layers:
+AmphiLoop packages domain knowledge and execution methodology into three layers:
 
 | Layer | Role | Description |
 |-------|------|-------------|

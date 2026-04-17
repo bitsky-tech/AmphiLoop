@@ -131,7 +131,7 @@ Pass to the agent:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
   - Please initialize the required execution environment based on the skill.
-  - The agent must record the full browser launch parameters used in this phase (headless, user-data-dir, channel, args, etc.) into the exploration report.
+  - The agent must record the full browser launch parameters used in this phase (headless, channel, args, etc., excluding `user-data-dir`) into the exploration report.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must create this directory before launching the browser, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up, so that subsequent phases start with a clean browser state.
 
 **Do not proceed to Phase 5 until complete.**
@@ -169,7 +169,7 @@ Pass to the agent:
 
 **Faithful to exploration report**
 
-**MUST faithfully follow the exploration report** — every numbered step in the "Operation Sequence" must be implemented in `on_workflow`. `on_workflow` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
+`on_workflow` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
 
 **Project mode affects code generation**
 
@@ -221,7 +221,7 @@ Pass to the agent:
 - **Run mode**: set `mode=RunMode.AMPHIFLOW` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW` if project mode is *Workflow*.
 - **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
   - **If Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` so the generated project runs in its own clean browser profile.
-  - **If Default mode**: omit `user_data_dir` (use the browser's default profile).
+  - **If Default mode**: omit `user_data_dir` (use the browser's default profile). All other launch parameters (headless, channel, args, viewport, etc.) must mirror those recorded in the exploration report from Phase 4 — otherwise the shared browser state observed during exploration may not be reachable at runtime.
 - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
 - **Tool assembly**: `[*browser_tools, *task_tools]` → pass to `agent.arun(tools=all_tools)`.
 - **LLM initialization** (based on the **LLM configured** flag from Phase 2, not the project mode):
@@ -244,11 +244,11 @@ The agent will:
 
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)
-- **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
 - **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
   - Please initialize the required execution environment based on the skill.
   - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`. Please cross-check `on_workflow` against the report's "Operation Sequence" and can treat any missing step as a bug to fix.
   - Work directory of the generated project from Phase 5
-  - The browser launch parameters used in this phase must stay consistent with those recorded in the exploration report from Phase 4 (CLI Exploration), so behavior is reproducible.
+  - **If Default browser mode**: verify the generated `main.py`'s browser launch parameters match those recorded in the exploration report from Phase 4. Mismatches under Default mode break shared-state assumptions and must be fixed.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must override `user_data_dir` in the debug-instrumented code to this path. After verification is complete and all resources are cleaned up, **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** to leave a clean state.

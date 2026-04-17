@@ -131,6 +131,7 @@ Pass to the agent:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
   - Please initialize the required execution environment based on the skill.
+  - The agent must record the full browser launch parameters used in this phase (headless, user-data-dir, channel, args, etc.) into the exploration report.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must create this directory before launching the browser, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up, so that subsequent phases start with a clean browser state.
 
 **Do not proceed to Phase 5 until complete.**
@@ -249,4 +250,5 @@ Pass to the agent:
   - Please initialize the required execution environment based on the skill.
   - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`. Please cross-check `on_workflow` against the report's "Operation Sequence" and can treat any missing step as a bug to fix.
   - Work directory of the generated project from Phase 5
+  - The browser launch parameters used in this phase must stay consistent with those recorded in the exploration report from Phase 4 (CLI Exploration), so behavior is reproducible.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must override `user_data_dir` in the debug-instrumented code to this path. After verification is complete and all resources are cleaned up, **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** to leave a clean state.

@@ -32,7 +32,7 @@ AmphiLoop/
     ├── run/                           ← runtime scripts used by agents
     │   ├── setup-env.sh               ← auto-install uv + uv init --bare
     │   ├── check-dotenv.sh            ← .env LLM configuration validation
-    │   └── monitor.sh                 ← process monitor for amphibious-verify agent
+    │   └── monitor.sh                 ← run-and-monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)
         └── sync-skills.sh             ← sync skills from source repos via manifest.ini
 ```

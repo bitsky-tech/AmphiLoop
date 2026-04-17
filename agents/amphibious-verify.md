@@ -116,49 +116,26 @@ for item in items:
 
 ## Phase 2: Run & Monitor
 
-### 2.1 Start Program
+### 2.1 Run & Monitor via Script
 
-Execute `main.py` and record the PID from the output and output to a log file.
+A single script handles both launch and monitoring:
 
-### 2.2 Monitor via Script
+```bash
+bash {PLUGIN_ROOT}/scripts/run/monitor.sh <WORK_DIR> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]
+```
 
-Start monitoring using a script:
+First call launches `uv run python main.py` in `<WORK_DIR>`; the script returns only when an actionable event occurs. Re-invoke with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit.
 
-Execute `monitor.sh` with the PID, log path, verify directory, and a timeout. The timeout must not exceed **5 minutes (300 seconds)** — verification is not a full production run, it only needs to confirm the code works correctly. To fit within this budget:
-- Loop slicing should be small (Phase 1.3)
-- Pagination should be limited to 1–2 pages
-- Any batch or iteration count should use the minimum needed to exercise the code path
-The script watches the process, captures logs, and detects actionable events (completion, errors, human input requests).
+**Timeout** must not exceed **300 seconds**. To stay within budget: keep loop slices small (Phase 1.3), limit pagination to 1–2 pages, use minimum iteration counts.
 
-The script **only returns control to the agent when an actionable event occurs**. The agent reads the exit code and stdout to decide the next action:
+| Exit | Meaning | Agent action |
+|------|---------|--------------|
+| **0** | Finished cleanly | Proceed to Phase 3 |
+| **1** | Finished with errors | Diagnose from stdout (last 50 log lines), fix code, re-run `monitor.sh` |
+| **2** | Human intervention required | Read prompt from stdout, ask user, write `<VERIFY_DIR>/human_response.json` as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
+| **3** | Timeout | Report to user and investigate |
 
-| Exit Code | Meaning | Agent Action |
-|-----------|---------|--------------|
-| **0** | Program finished successfully | Proceed to Phase 3 |
-| **1** | Program finished with errors | Read the log excerpt from stdout, diagnose, fix code, restart (go to 2.1) |
-| **2** | Human intervention required | Read `human_request.json` from stdout, ask user, write `human_response.json`, re-run monitor |
-| **3** | Timeout | Report to user, investigate |
-
-#### On exit code 2 (Human Intervention)
-
-1. The script stdout contains the content of `human_request.json` — read the prompt
-2. After the user confirms, create `.bridgic/verify/human_response.json`:
-   ```json
-   {"response": "<user's reply or 'done'>"}
-   ```
-3. The program detects the response file and continues automatically
-4. Re-run `monitor.sh` with the same PID to continue watching
-
-#### On exit code 1 (Error)
-
-1. The script stdout contains the last 50 lines of the log — read the error context
-2. Read the source code file where the error occurred
-3. Diagnose and fix the root cause
-4. Restart the program (go to 2.1)
-
-#### Maximum retries
-
-If the same error occurs 3 times after fixes, stop and report the issue to the user.
+If the same error recurs 3 times after fixes, stop and report to the user.
 
 ---
 

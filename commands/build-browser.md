@@ -50,9 +50,9 @@ Present the options as:
 
 > Choose project mode:
 >
-> **1. Workflow** — Pure script, no AI. Every step runs deterministically. Best for stable, predictable tasks.
+> **1. Workflow** — Every step runs deterministically. Best for stable, predictable tasks.
 >
-> **2. Amphiflow** — Script + AI fallback. Runs the script normally, but switches to AI when something unexpected happens (CAPTCHA, layout change, etc.). Requires LLM config.
+> **2. Amphiflow** — Every step runs normally, but switches to AI when something unexpected happens (CAPTCHA, layout change, etc.). Requires LLM config.
 >
 
 Record the chosen **project mode** — it affects code generation in Phase 5.
@@ -143,9 +143,9 @@ Pass to the agent:
 
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)
-- **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
 - **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
+  - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
   - **LLM configured** from Phase 2 — whether LLM environment was validated (yes/no).
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`
   - Please initialize the required execution environment based on the skill.
@@ -165,6 +165,10 @@ Pass to the agent:
 - Copy the user's `{PROJECT_ROOT}/TASK.md` content verbatim into the generated project's `task.md`.
 
 #### agents.py
+
+**Faithful to exploration report**
+
+**MUST faithfully follow the exploration report** — every numbered step in the "Operation Sequence" must be implemented in `on_workflow`. `on_workflow` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
 
 **Project mode affects code generation**
 
@@ -243,6 +247,6 @@ Pass to the agent:
 - **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Please initialize the required execution environment based on the skill.
-  - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`
+  - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`. Please cross-check `on_workflow` against the report's "Operation Sequence" and can treat any missing step as a bug to fix.
   - Work directory of the generated project from Phase 5
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must override `user_data_dir` in the debug-instrumented code to this path. After verification is complete and all resources are cleaned up, **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** to leave a clean state.

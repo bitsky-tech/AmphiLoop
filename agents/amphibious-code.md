@@ -152,6 +152,14 @@ llm = OpenAILlm(
 
 4. **Mode selection (optional — defaults to `RunMode.AUTO`).** The mode determines execution flow and error handling. If the task or domain context specifies a fixed mode, pass it explicitly to `arun()`: `RunMode.WORKFLOW` (pure workflow), `RunMode.AGENT` (pure LLM-driven), or `RunMode.AMPHIFLOW` (workflow-first with agent fallback — requires both `on_workflow` and `on_agent`). If no mode is specified, omit the argument and `arun()` will pick the mode from which template methods are overridden.
 
+### log/
+
+The output directory for **logs produced by the generated project at runtime** — agent traces, tool logs, debug output emitted while the project solves its task. Configure logging in `main.py` to write log files into this directory (relative path `log/`). Do not emit logs to `/tmp`, the user's home, or stdout only — they must land under `log/` so downstream orchestration (aggregation, tailing, CI capture) treats every generated project uniformly.
+
+### result/
+
+The output directory for **task results produced by the generated project at runtime** — extracted data, generated files, persisted records, and anything else that represents the project's answer to its task. All task outputs must be written here under a relative path like `result/<filename>`. If the task description specifies an output filename, place it under `result/` rather than the project root or anywhere else. Uniform placement here is what lets downstream orchestration collect and compare results across projects.
+
 ## Phase 3: Validate Generated Helpers and Tools
 
 After all code is generated, validate each helper function in `helpers.py` and each task tool in `tools.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.

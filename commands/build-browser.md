@@ -18,18 +18,18 @@ Turn a browser task into a working bridgic-amphibious project.
 1. Initialize Task          (this command — generate TASK.md template, user fills in task details)
 2. Configure Pipeline       (this command — project mode, LLM config if needed, browser mode)
 3. Setup Environment        (this command, runs setup-env.sh)
-4. CLI Exploration          (→ browser-explorer agent)
+4. CLI Exploration          (→ amphibious-explore agent)
 5. Generate Amphibious Code (→ amphibious-code agent)
 6. Verify                   (→ amphibious-verify agent)
 ```
 
-> **Path variables**: `{PLUGIN_ROOT}` and `{PROJECT_ROOT}` are the paths below use these prefixes. If either is missing, the plugin was not loaded correctly — do not proceed.
+> **Path variables**: `{PLUGIN_ROOT}` and `{PROJECT_ROOT}` are path placeholders — all paths below use these prefixes. If either is missing, the plugin was not loaded correctly — do not proceed.
 
 ---
 
 ## Phase 1: Initialize Task
 
-Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/examples/build-browser-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill in it.
+Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/examples/build-browser-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill it in.
 
 Wait for the user to confirm they have filled in the template. Then read `{PROJECT_ROOT}/TASK.md` and extract the *Task Description*:
 - Goal
@@ -123,16 +123,40 @@ Do not proceed until the script exits 0.
 
 ## Phase 4: CLI Exploration
 
-**Delegate to the `browser-explorer` agent.**
+**Delegate to the `amphibious-explore` agent.**
 
 Pass to the agent:
+
 - **Task description** from Phase 1 (`TASK.md`)
 - **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
-  - Please initialize the required execution environment based on the skill.
   - The agent must record the full browser launch parameters used in this phase (headless, channel, args, etc., excluding `user-data-dir`) into the exploration report.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must create this directory before launching the browser, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up, so that subsequent phases start with a clean browser state.
+- **Domain context** (browser automation, pre-distilled):
+
+   The **Observation protocol**, **Cleanup protocol**, and **Applicable directives** below are the distilled output of the usual `Explore Domain Context` analysis for this domain.
+   - Include them **verbatim** in the report's §1 Domain Guidance — do not re-derive them from the skill.
+   - Use the Observation protocol as the Core Loop's observation command throughout exploration.
+   - Still read the `bridgic-browser` skill at `{PLUGIN_ROOT}/skills/bridgic-browser/SKILL.md` — you will need it to set up the execution environment (dependencies + installation) and for the full CLI action vocabulary used during exploration.
+
+   **Observation protocol** — run both commands together before every action to capture the current environment state:
+
+   ```bash
+   uv run bridgic-browser snapshot       # current tab's page state
+   uv run bridgic-browser tabs           # all open tabs + which is active
+   ```
+
+   - Use `tabs` to track open tabs and identify the active tab so subsequent actions target the correct page context.
+   - `snapshot` has two output modes (the CLI decides automatically):
+     - **Minimal content** — the full snapshot is printed to stdout; locate target elements directly in the terminal output.
+     - **Substantial content** — only a file path is printed; search for task-related keywords in that file, or read it in full to find the target elements and their refs.
+
+   **Cleanup protocol** — run once at the end of exploration to release all browser processes started by `bridgic-browser`:
+
+   ```bash
+   uv run bridgic-browser close
+   ```
 
 **Do not proceed to Phase 5 until complete.**
 
@@ -149,92 +173,143 @@ Pass to the agent:
   - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
   - **LLM configured** from Phase 2 — whether LLM environment was validated (yes/no).
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`
-  - Please initialize the required execution environment based on the skill.
-  - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 4
-- **Domain context** (browser automation): Include the following browser-specific instructions in the delegation prompt:
+  - The exploration report path: `{PROJECT_ROOT}/.bridgic/explore/exploration_report.md` from Phase 4.
+- **Domain context** (browser automation) — browser-specific instructions that override or supplement the `amphibious-code` agent's general per-file rules:
 
-### Domain Context to Pass
+  **Domain reference files to read**:
+  - `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
+  - `{PLUGIN_ROOT}/examples/build-browser-code-patterns.md` — browser-specific code patterns for all project files
 
-**Domain reference files to read**:
-- `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
-- `{PLUGIN_ROOT}/examples/build-browser-code-patterns.md` — browser-specific code patterns for all project files
+  **Faithful to exploration report** — `on_workflow` in `agents.py` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
 
-**Browser-specific per-file rules** (override or supplement the agent's general rules):
+  **Action principle — never modify page state via JavaScript.** Do not use `evaluate_javascript_on_ref` (or any JS execution) to set form values, trigger clicks, or manipulate DOM elements. JS-based DOM changes bypass the frontend framework's event bindings — the page appears to change but internal state remains stale. `evaluate_javascript_on_ref` is only acceptable for **reading** data from the page, never for writing.
 
-#### task.md
+  **Action conventions**:
+  - `ActionCall` tool names must match SDK method names (not CLI command names). See `cli-sdk-api-mapping.md`.
+  - **Explicit `wait_for` after every browser action.** Every browser operation (`navigate_to`, `click_element_by_ref`, `input_text_by_ref`, etc.) must be immediately followed by a `yield ActionCall("wait_for", ...)` call. Recommended durations by action type:
 
-- Copy the user's `{PROJECT_ROOT}/TASK.md` content verbatim into the generated project's `task.md`.
+    | Action type | Wait (seconds) |
+    |---|---|
+    | Navigation / full page load | 3–5 |
+    | Click that triggers content loading (search, filter, tab switch) | 3–5 |
+    | Click that opens dropdown / toggles UI element | 1–2 |
+    | Text input / form fill | 1–2 |
+    | Close tab / minor UI action | 1–2 |
 
-#### agents.py
+    Adjust based on actual observed response times during exploration.
 
-**Faithful to exploration report**
+  **Observation management — do NOT call `get_snapshot_text` inside `on_workflow` to read page state.** The `observation()` hook keeps `ctx.observation` up-to-date — read it directly. The only exception is when `on_workflow` needs a snapshot before hooks have run (e.g., the very first state check after navigation).
 
-`on_workflow` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
+  **`agents.py` hooks — `observation` and `after_action`**:
 
-**Project mode affects code generation**
+  *`observation` — live browser state before each step.* Called automatically before each `yield` in `on_workflow` and each OTC cycle. Returns the current browser state (open tabs + page snapshot) for `ctx.observation`:
 
-- **Workflow mode**: Generate only `on_workflow` with deterministic step-by-step actions with: `ActionCall`, `AgentCall` (with LLM configured = yes), and `HumanCall`.
-- **Amphiflow mode**: Generate both `on_workflow` (primary path) and `on_agent` (final fallback handler).
+  ```python
+  async def observation(self, ctx) -> Optional[str]:
+      if ctx.browser is None:
+          return "No browser available."
 
-**Element references**
+      parts = []
+      tabs = await ctx.browser.get_tabs()
+      if tabs:
+          parts.append(f"[Open tabs]\n{tabs}")
+      snapshot = await ctx.browser.get_snapshot_text(limit=1000000)
+      if snapshot:
+          parts.append(f"[Snapshot]\n{snapshot}")
+      return "\n\n".join(parts) if parts else "No page loaded."
+  ```
 
-- **Stable refs**: hardcode directly in `ActionCall` (e.g., `ref="4084c4ad"`). These are element identifiers from the exploration report that don't change between page visits.
-- **Volatile refs** (list items, dynamic rows, search results): re-extract from `ctx.observation` at runtime using helpers.
+  *`after_action` — mandatory override for observation refresh.* Called automatically after each tool call. Refreshes `ctx.observation` once `wait_for` completes. Critical for browser projects — without it, inline code between a `wait_for` yield and the next yield sees stale page state.
 
-**Interaction principles**
+  ```python
+  async def after_action(self, step_result, ctx):
+      action_result = step_result.result
+      if hasattr(action_result, "results"):
+          for step in action_result.results:
+              if step.tool_name == "wait_for" and step.success:
+                  ctx.observation = await self.observation(ctx)
+                  break
+  ```
 
-- **Simulate human interaction — NEVER use JavaScript to modify page state.** Do not use `evaluate_javascript_on_ref` (or any JS execution) to set form values, trigger clicks, or manipulate DOM elements. JS-based DOM changes bypass the frontend framework's event bindings — the page appears to change but internal state remains stale. `evaluate_javascript_on_ref` is only acceptable for **reading** data from the page, never for writing.
-- **Dynamic parameters must be computed at runtime.** When the task description contains relative or context-dependent values (e.g., "past week", "today", "last 30 days"), compute them in `on_workflow` using Python's `datetime` module. Never hardcode dates, counts, or any value that depends on when the program runs.
+  **`workers.py` — add a `browser` field to `CognitiveContext`.** Declare `browser` (the `Browser` SDK instance) on your `CognitiveContext` subclass and mark it `json_schema_extra={"display": False}` — it is a non-serializable resource and must not be serialized into the LLM prompt.
 
-**Tool call conventions**
+  **`helpers.py` — extraction from `ctx.observation`.** Helpers parse the accessibility tree text in `ctx.observation` and must be written based on the actual a11y tree structure observed during exploration (see the snapshot files under `{PROJECT_ROOT}/.bridgic/explore/`).
 
-- `ActionCall` tool names must match SDK method names (not CLI command names). See `cli-sdk-api-mapping.md`.
-- **Explicit `wait_for` after every browser action.** Every browser operation (`navigate_to`, `click_element_by_ref`, `input_text_by_ref`, etc.) must be immediately followed by a `yield ActionCall("wait_for", ...)` call. Recommended durations by action type:
+  ```python
+  def find_active_tab(observation: str) -> Optional[str]:
+      """Find the active tab's page_id."""
+      if not observation:
+          return None
+      match = re.search(r'(page_\d+)\s*\(active\)', observation)
+      return match.group(1) if match else None
+  ```
 
-  | Action type | Wait (seconds) |
-  |---|---|
-  | Navigation / full page load | 3–5 |
-  | Click that triggers content loading (search, filter, tab switch) | 3–5 |
-  | Click that opens dropdown / toggles UI element | 1–2 |
-  | Text input / form fill | 1–2 |
-  | Close tab / minor UI action | 1–2 |
+  **`main.py` — browser lifecycle, run mode, LLM init, tool assembly, and runtime goal**:
+  - **Run mode**: set `mode=RunMode.AMPHIFLOW` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW`.
+  - **LLM initialization** (based on the **LLM configured** flag from Phase 2, not the project mode):
+    - **LLM configured = yes**: initialize `OpenAILlm` from `.env` / environment variables and pass `llm=llm` to the agent constructor.
+    - **LLM configured = no**: pass `llm=None` to the agent constructor. Do not import or initialize any LLM classes.
+  - **Browser lifecycle**: `async with Browser(...) as browser` — create in `main.py`, store in context.
+    - **Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` so the generated project runs in its own clean browser profile.
+    - **Default mode**: omit `user_data_dir` (use the browser's default profile).
+    - All other launch parameters (headless, channel, args, viewport, etc.) must mirror those recorded in the exploration report from Phase 4 — otherwise, under Default mode the shared browser state observed during exploration may not be reachable at runtime.
+  - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
+  - **Goal at runtime**: read the project's `task.md` file and pass its full content as the `goal` parameter to `agent.arun()`.
 
-  Adjust based on actual observed response times during exploration.
+  ```python
+  import asyncio
+  from pathlib import Path
+  from bridgic.amphibious import RunMode
+  from bridgic.browser.session import Browser
+  from bridgic.browser.tools import BrowserToolSetBuilder
+  from tools import ALL_TASK_TOOLS
+  # When LLM configured = yes, also:
+  # from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
+  # from config import LLM_API_BASE, LLM_API_KEY, LLM_MODEL
 
-**Observation management**
+  async def main():
+      # LLM configured = yes:
+      #   llm = OpenAILlm(
+      #       api_key=LLM_API_KEY,
+      #       api_base=LLM_API_BASE,
+      #       configuration=OpenAIConfiguration(model=LLM_MODEL, temperature=0.0, max_tokens=16384),
+      #       timeout=180.0,
+      #   )
+      # LLM configured = no:
+      llm = None
 
-- **Max snapshot limit**: `observation()` must call `get_snapshot_text(limit=1000000)` to ensure the full snapshot is captured.
-- **Do NOT call `get_snapshot_text` in `on_workflow`** to read page state. The `observation()` hook keeps `ctx.observation` up-to-date — read it directly. The only exception is when `on_workflow` needs a snapshot before hooks have run (e.g., the very first state check after navigation).
-- **`after_action` hook (MUST override)**: refresh `ctx.observation` after `wait_for` completes. Without this, inline code between a `wait_for` yield and the next yield sees stale (pre-wait) page state. See `build-browser-code-patterns.md` for the mandatory code pattern and optional additional uses.
+      # Project mode = Amphiflow:
+      #   mode = RunMode.AMPHIFLOW
+      # Project mode = Workflow:
+      mode = RunMode.WORKFLOW
 
-#### workers.py
+      # Launch parameters below must mirror the exploration report's recorded values.
+      # Under Isolated mode also pass user_data_dir="<PROJECT_ROOT>/.bridgic/browser/".
+      async with Browser(headless=False) as browser:
+          builder = BrowserToolSetBuilder.for_tool_names(
+              browser,
+              "navigate_to",
+              # ...others based on exploration
+              strict=True,
+          )
+          browser_tools = builder.build()["tool_specs"]
+          all_tools = [*browser_tools, *ALL_TASK_TOOLS]
 
-- The `browser` field must be marked `json_schema_extra={"display": False}` — serializing a browser instance is meaningless.
-- State-tracking fields (e.g., scraped item sets, counters) should remain visible.
+          goal = Path("task.md").read_text()
 
-#### helpers.py
+          agent = MyAgent(llm=llm, verbose=True)
+          await agent.arun(
+              goal=goal,
+              browser=browser,
+              tools=all_tools,
+              mode=mode,
+          )
 
-- Extraction functions parse live `ctx.observation` at runtime. To **write** these helpers, read the snapshot files in `{PROJECT_ROOT}/.bridgic/explore/` (referenced in the exploration report) for the real a11y tree structure. Do not guess the format.
+  if __name__ == "__main__":
+      asyncio.run(main())
+  ```
 
-#### main.py
-
-- **Run mode**: set `mode=RunMode.AMPHIFLOW` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW` if project mode is *Workflow*.
-- **Browser lifecycle**: `async with Browser() as browser` — create in main.py, store in context.
-  - **If Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` so the generated project runs in its own clean browser profile.
-  - **If Default mode**: omit `user_data_dir` (use the browser's default profile). All other launch parameters (headless, channel, args, viewport, etc.) must mirror those recorded in the exploration report from Phase 4 — otherwise the shared browser state observed during exploration may not be reachable at runtime.
-- **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
-- **Tool assembly**: `[*browser_tools, *task_tools]` → pass to `agent.arun(tools=all_tools)`.
-- **LLM initialization** (based on the **LLM configured** flag from Phase 2, not the project mode):
-  - **LLM configured = yes** : initialize `OpenAILlm` from `.env` / environment variables and pass `llm=llm` to the agent constructor.
-  - **LLM configured = no** : pass `llm=None` to the agent constructor. Do not import or initialize any LLM classes.
-- At runtime, read the project's `task.md` file and pass its full content as the `goal` parameter to `agent.arun()`. Load it from `task.md`.
-
-The agent will:
-1. Scaffold the project via `bridgic-amphibious create`
-2. Load framework references from `bridgic-amphibious` skill + browser domain references from above
-3. Complete all project files based on the scaffold created by `bridgic-amphibious create`
-
-**Proceed directly to Phase 6**. Code quality issues are the sole responsibility of the amphibious-verify agent — it will run the project, detect errors from actual execution, and fix them with proper diagnosis.
+  **`task.md`** — copy the user's `{PROJECT_ROOT}/TASK.md` content verbatim into the generated project's `task.md` file.
 
 ---
 
@@ -247,8 +322,7 @@ Pass to the agent:
 - **Auxiliary context**:
   - `PLUGIN_ROOT` and `PROJECT_ROOT` values
   - **Project mode** from Phase 2 — **Workflow** or **Amphiflow**
-  - Please initialize the required execution environment based on the skill.
-  - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`. Please cross-check `on_workflow` against the report's "Operation Sequence" and can treat any missing step as a bug to fix.
+  - Exploration report and snapshot files from `{PROJECT_ROOT}/.bridgic/explore/`. Please cross-check `on_workflow` against the report's "Operation Sequence" and treat any missing step as a bug to fix.
   - Work directory of the generated project from Phase 5
   - **If Default browser mode**: verify the generated `main.py`'s browser launch parameters match those recorded in the exploration report from Phase 4. Mismatches under Default mode break shared-state assumptions and must be fixed.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must override `user_data_dir` in the debug-instrumented code to this path. After verification is complete and all resources are cleaned up, **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** to leave a clean state.

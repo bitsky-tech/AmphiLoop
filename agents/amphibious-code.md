@@ -35,7 +35,7 @@ You receive from the calling command:
 bridgic-amphibious create -n <project-name> --task "<task description>"
 ```
 
-This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `skills/`, `result/`, `log/`.
+This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `main.py`, `skills/`, `result/`, `log/`.
 
 **After the scaffold is created**, adapt each generated file based on the task description, domain context, and auxiliary context.
 
@@ -52,8 +52,8 @@ The agent class is an `AmphibiousAutoma` subclass. The framework provides severa
 | `observation(self, ctx)` | Before each OTC cycle and before each `yield` in workflow | **State acquisition.** Fetch and return the current environment state as a string. The return value populates `ctx.observation`. All domain-specific state fetching (reading pages, querying APIs, checking status) belongs here. |
 | `before_action(self, decision_result, ctx)` | Before each tool execution | **Pre-action processing.** Track state changes (e.g., record items being processed), sanitize tool arguments (e.g., fix LLM formatting mistakes), or gate actions. |
 | `after_action(self, step_result, ctx)` | After each tool execution | **Post-action processing.** React to the result of a tool call — update derived state (e.g., refresh `ctx.observation` to reflect the new environment), accumulate results, trigger side effects (logging, notifications), or perform cleanup. |
-| `on_workflow(self, ctx)` | When running in WORKFLOW or AMPHIFLOW mode | **Deterministic orchestration.** An async generator that yields `ActionCall`, `AgentCall`, or `HumanCall` to express the step sequence. This method should only contain **action logic**.|
-| `on_agent(self, ctx)` | When running in AGENT mode, or as fallback when a workflow step fails | **LLM-driven execution.** Awaits `think_unit` workers that use the LLM to observe-think-act. Must be defined even in workflow-centric agents, otherwise fallback has nowhere to go. |
+| `on_workflow(self, ctx)` | When running in `WORKFLOW` or `AMPHIFLOW` mode | **Deterministic orchestration.** An async generator that yields `ActionCall`, `AgentCall`, or `HumanCall` to express the step sequence. This method should only contain **action logic**.|
+| `on_agent(self, ctx)` | When running in `AGENT` mode, or as fallback when a workflow step fails in `AMPHIFLOW` mode | **LLM-driven execution.** Awaits `think_unit` workers that use the LLM to observe-think-act. Required in `AGENT` and `AMPHIFLOW` modes (fallback needs somewhere to go); not required in pure `WORKFLOW` mode, which has no fallback path. |
 
 #### on_workflow Best Practices
 
@@ -75,9 +75,30 @@ The agent class is an `AmphibiousAutoma` subclass. The framework provides severa
    yield HumanCall(prompt="Please confirm this action")
    ```
 
+5. **Dynamic parameters must be computed at runtime.** When the task description contains relative or context-dependent values (e.g., "past week", "today", "last 30 days"), compute them inline in `on_workflow` (for example using Python's `datetime` module) rather than hardcoding dates, counts, or any value that depends on when the program runs.
+
 ### tools.py
 
 1. **Task tools: async functions registered via `FunctionToolSpec.from_raw()`.** For task-specific operations (saving data, computation, external API calls), write standard async Python functions with typed parameters and docstrings, then register with `FunctionToolSpec.from_raw()` (imported from `bridgic.core.agentic.tool_specs`). The docstring becomes the tool description the LLM sees, so make it precise.
+
+```python
+from bridgic.core.agentic.tool_specs import FunctionToolSpec
+
+async def save_record(item_id: str, title: str, detail: str) -> str:
+    """Save an extracted record.
+
+    Parameters
+    ----------
+    item_id : str
+        Unique identifier.
+    title : str
+        Item title.
+    detail : str
+        Extracted content.
+    """
+    # Replace with actual persistence
+    ...
+```
 
 ### workers.py
 
@@ -87,28 +108,63 @@ The agent class is an `AmphibiousAutoma` subclass. The framework provides severa
 
 1. **Standalone functions only.** Helpers are pure functions that extract or transform domain-specific data. Putting them on the agent class couples parsing logic to the agent lifecycle and makes testing harder. Keep them in `helpers.py` as importable utilities.
 
-2. **Base extraction logic on actual data formats from pre-analysis.** Do not guess data formats. Use the real data structures or samples from the pre-analysis report to write precise extraction logic. Data formats vary between domains and applications, so every helper must be task-specific.
+2. **Base extraction logic on actual data formats.** Do not guess data formats. Use the real data structures or samples to write precise extraction logic. Data formats vary between domains and applications, so every helper must be task-specific.
 
 ### config.py
 
-1. **Fixed template — load from environment only.** Use `dotenv` to load `LLM_API_BASE`, `LLM_API_KEY`, and `LLM_MODEL` from `.env`. Do not hardcode API keys or model names. This file should contain no logic beyond environment variable loading. Add additional domain-specific environment variables as needed.
+1. **Fixed template — load from environment only.** Use `dotenv` to load `LLM_API_BASE`, `LLM_API_KEY`, `LLM_MODEL` or other environment variables from `.env`. Do not hardcode API keys or model names. This file should contain no logic beyond environment variable loading. Add additional domain-specific environment variables as needed.
+
+```python
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+LLM_API_BASE = os.getenv("LLM_API_BASE")
+LLM_API_KEY = os.getenv("LLM_API_KEY")
+LLM_MODEL = os.getenv("LLM_MODEL")
+...  # Other domain-specific config variables
+```
 
 ### main.py
 
-1. **Use `OpenAILlm` + `OpenAIConfiguration` for LLM initialization.** The initialization pattern is fixed: import from `bridgic.llms.openai`, pass config values from `config.py`, set `temperature=0.0` for deterministic workflows.
+1. **Args parsing (only when the task requires it).** If the task description requires the generated project to accept runtime parameters (input files, output directories, mode selection, etc.), parse them with `argparse`. If no such requirement exists, omit argparse — do not add it for its own sake.
 
-2. **Resource lifecycle via async context managers.** Create domain-specific resources (connections, clients, sessions) in `main.py` using async context managers for proper cleanup even on exceptions. Store resources in the custom context. Resources must not be created inside the agent class.
+2. **Use `OpenAILlm` + `OpenAIConfiguration` for LLM initialization.** The initialization pattern is fixed: import from `bridgic.llms.openai`, pass config values from `config.py`, set `temperature=0.0` for deterministic workflows.
+```python
+# Such as:
+from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
+from config import LLM_API_BASE, LLM_API_KEY, LLM_MODEL
+llm = OpenAILlm(
+    api_key=LLM_API_KEY,
+    api_base=LLM_API_BASE,
+    configuration=OpenAIConfiguration(
+        model=LLM_MODEL,
+        temperature=0.0,
+        max_tokens=16384,
+    ),
+    timeout=180.0,
+)
+```
 
 3. **Tool assembly: combine domain tools + task tools into a single list.** Build domain-specific tools (from SDK or library), collect task tools from `tools.py`, merge them into a single list, and pass to `agent.arun(tools=all_tools)`. The agent framework distributes tools to both `on_workflow` steps and `on_agent` think units.
 
-## Phase 3: Validate Helpers
+4. **Mode selection (optional — defaults to `RunMode.AUTO`).** The mode determines execution flow and error handling. If the task or domain context specifies a fixed mode, pass it explicitly to `arun()`: `RunMode.WORKFLOW` (pure workflow), `RunMode.AGENT` (pure LLM-driven), or `RunMode.AMPHIFLOW` (workflow-first with agent fallback — requires both `on_workflow` and `on_agent`). If no mode is specified, omit the argument and `arun()` will pick the mode from which template methods are overridden.
 
-After all code is generated, validate each helper function against the real snapshot files from the auxiliary context (e.g., `.bridgic/explore/`). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
+## Phase 3: Validate Generated Helpers and Tools
+
+After all code is generated, validate each helper function in `helpers.py` and each task tool in `tools.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
 
 ```bash
+# Such as:
 uv run python -c "
 from helpers import extract_items
 snapshot = open('.bridgic/explore/snapshot_xxx.txt').read()
 print(extract_items(snapshot))
 "
 ```
+
+## Phase 4: Write Project README
+
+Write a `README.md` that explains how to run the project. This is the final step after all code is generated and validated. The README should be clear enough for another developer to understand the project purpose and how to execute it without reading the code.

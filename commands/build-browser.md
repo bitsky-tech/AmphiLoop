@@ -19,7 +19,7 @@ Turn a browser task into a working bridgic-amphibious project.
 2. Configure Pipeline       (this command — project mode, LLM config if needed, browser mode)
 3. Setup Environment        (this command, runs setup-env.sh)
 4. CLI Exploration          (→ browser-explorer agent)
-5. Generate Amphibious Code (→ amphibious-generator agent)
+5. Generate Amphibious Code (→ amphibious-code agent)
 6. Verify                   (→ amphibious-verify agent)
 ```
 
@@ -140,7 +140,7 @@ Pass to the agent:
 
 ## Phase 5: Generate Amphibious Code
 
-**Delegate to the `amphibious-generator` agent.**
+**Delegate to the `amphibious-code` agent.**
 
 Pass to the agent:
 - **Task description** from Phase 1 (`TASK.md`)

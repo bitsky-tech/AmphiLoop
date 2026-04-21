@@ -61,7 +61,7 @@ Your input should contain two key intents:
 1. **Parse** — Extracts URL, goal, and expected output from your task description
 2. **Setup** — Checks environment (uv, dependencies, `.env`)
 3. **Explore** — Delegates to `browser-explorer` agent to systematically explore the target website via CLI
-4. **Generate** — Delegates to `amphibious-generator` agent to produce a complete project with all source files
+4. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
 5. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
 
 ### Agents
@@ -71,7 +71,7 @@ Agents are execution specialists delegated by commands. They are not called dire
 | Agent | What It Does |
 |-------|-------------|
 | **browser-explorer** | Systematically explores a website via CLI, produces a structured exploration report with snapshots |
-| **amphibious-generator** | Generates a complete bridgic-amphibious project from a task description and exploration report |
+| **amphibious-code** | Generates a complete bridgic-amphibious project from a task description and exploration report |
 | **amphibious-verify** | Injects debug instrumentation, runs the project with monitoring, validates results, and cleans up |
 
 ### Skills
@@ -99,7 +99,7 @@ AmphiLoop/
 │   └── bridgic-llms/            #   LLM provider integration
 ├── agents/                      # Execution methodology (3 agents)
 │   ├── browser-explorer.md      #   CLI exploration expert
-│   ├── amphibious-generator.md  #   Code generation expert
+│   ├── amphibious-code.md       #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
 │   └── build-browser.md         #   End-to-end pipeline

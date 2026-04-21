@@ -7,7 +7,7 @@
   ],
   "agents": [
     "./agents/browser-explorer.md",
-    "./agents/amphibious-generator.md",
+    "./agents/amphibious-code.md",
     "./agents/amphibious-verify.md"
 
   ],

@@ -20,10 +20,11 @@ AmphiLoop/
 │   ├── amphibious-code.md             ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
-│   └── build-browser.md               ← /build-browser pipeline
-├── examples/                          ← static example docs (not auto-scanned by Claude Code)
-│   ├── build-browser-code-patterns.md ← browser-specific code patterns
-│   └── build-browser-task-template.md ← TASK.md template for /build-browser Phase 1
+│   ├── build.md                       ← /build pipeline (domain-agnostic)
+│   └── build-browser.md               ← /build-browser pipeline (browser-domain specialization)
+├── templates/                         ← static templates read by commands (not auto-scanned by Claude Code)
+│   ├── build-task-template.md         ← unified TASK.md template (used by /build and /build-browser Phase 1)
+│   └── build-browser-code-patterns.md ← browser-specific code patterns (loaded by /build-browser Phase 5)
 ├── hooks/                             ← auto-loaded by Claude Code
 │   └── hooks.json                     ← hook definitions
 └── scripts/
@@ -43,7 +44,7 @@ AmphiLoop/
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
 | **Agent** | Deep execution methodology — delegated by commands | amphibious-explore, amphibious-code, amphibious-verify |
-| **Command** | Multi-step orchestrator invoked by user | /build-browser |
+| **Command** | Multi-step orchestrator invoked by user | /build, /build-browser |
 
 ## Installation
 
@@ -73,4 +74,5 @@ claude plugin install AmphiLoop
 
 | Command | When to Use |
 |---------|-------------|
-| **/build-browser** | Turn a browser task into a working bridgic-amphibious project (parse → explore → generate → verify) |
+| **/build** | Turn any task into a working bridgic-amphibious project; users supply domain references (SKILLs, CLIs, SDK docs, style guides) and the pipeline orchestrates mode selection → explore → code → verify |
+| **/build-browser** | Browser-domain specialization of `/build` — pre-distills browser domain context (observation protocol, code patterns, verification rules) |

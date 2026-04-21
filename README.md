@@ -41,9 +41,29 @@ After installation, skills, agents, and commands (e.g. `/build-browser`) are aut
 
 Commands are user-invocable workflows. Invoke them with the `/` prefix:
 
+#### `/AmphiLoop:build`
+
+Domain-agnostic pipeline. Describe any task, list the domain references the agents should read (SKILLs, CLI help, SDK docs, style guides), and ask to generate a runnable project:
+
+```
+/AmphiLoop:build
+
+I want to aggregate all `orders_*.csv` files under ~/data/inputs into a single
+summary.csv — one row per customer with totals.
+```
+
+**What happens under the hood:**
+
+1. **Initialize Task** — Writes a `TASK.md` template where you fill in goal, expected output, and **Domain References**
+2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow) and LLM config if needed
+3. **Setup Environment** — Checks `uv`, runs `uv init`
+4. **Explore** — Delegates to `amphibious-explore` agent, which reads your domain references and probes the environment
+5. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
+6. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
+
 #### `/AmphiLoop:build-browser`
 
-Describe a browser automation task and ask to generate a stable, runnable project:
+Browser-domain specialization of `/build`. Pre-distills the browser domain context (observation protocol, code patterns, verification rules) so you only need to describe the browser automation task:
 
 ```
 /AmphiLoop:build-browser
@@ -56,13 +76,7 @@ Your input should contain two key intents:
 1. **A browser automation task** — what to do on the target website (navigate, click, extract, etc.)
 2. **A request to generate a stable project** — you want a working program/project that can run reliably
 
-**What happens under the hood:**
-
-1. **Parse** — Extracts URL, goal, and expected output from your task description
-2. **Setup** — Checks environment (uv, dependencies, `.env`)
-3. **Explore** — Delegates to `amphibious-explore` agent to systematically explore the target website via CLI
-4. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
-5. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
+The under-the-hood phases mirror `/build`, but Phase 2 also asks about browser environment mode (Default vs Isolated), and Phases 4–6 pass pre-distilled browser-specific domain context to the agents.
 
 ### Agents
 
@@ -102,10 +116,11 @@ AmphiLoop/
 │   ├── amphibious-code.md       #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
-│   └── build-browser.md         #   End-to-end pipeline
-├── examples/                    # Static example docs (not auto-scanned)
-│   ├── build-browser-code-patterns.md
-│   └── build-browser-task-template.md
+│   ├── build.md                 #   Domain-agnostic pipeline
+│   └── build-browser.md         #   Browser-domain pipeline
+├── templates/                   # Static templates read by commands (not auto-scanned)
+│   ├── build-task-template.md         #   Unified TASK.md template for /build and /build-browser
+│   └── build-browser-code-patterns.md #   Browser-specific code patterns
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations

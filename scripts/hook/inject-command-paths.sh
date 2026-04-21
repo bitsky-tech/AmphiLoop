@@ -146,5 +146,5 @@ PWD_ESC=$(json_escape "$PWD")
 # newlines when rendering the additionalContext value back into the context.
 # permissionDecision is deliberately omitted so the PreToolUse branch only
 # adds context and does not override the permission flow of other hooks.
-printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"---\\nPLUGIN_ROOT=%s\\nPROJECT_ROOT=%s\\nUse these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PLUGIN_ROOT}/examples/..., {PROJECT_ROOT}/.bridgic/...\\n---"}}' "$HOOK_EVENT" "$ROOT_ESC" "$PWD_ESC"
+printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"---\\nPLUGIN_ROOT=%s\\nPROJECT_ROOT=%s\\nUse these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PLUGIN_ROOT}/templates/..., {PROJECT_ROOT}/.bridgic/...\\n---"}}' "$HOOK_EVENT" "$ROOT_ESC" "$PWD_ESC"
 exit 0

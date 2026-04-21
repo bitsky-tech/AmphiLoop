@@ -29,7 +29,7 @@ Turn a browser task into a working bridgic-amphibious project.
 
 ## Phase 1: Initialize Task
 
-Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/examples/build-browser-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill it in.
+Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their browser automation task. Write the following template: `{PLUGIN_ROOT}/templates/build-task-template.md`. The template includes instructions and sections for the user to fill in. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill it in.
 
 Wait for the user to confirm they have filled in the template. Then read `{PROJECT_ROOT}/TASK.md` and extract the *Task Description*:
 - Goal
@@ -178,7 +178,7 @@ Pass to the agent:
 
   **Domain reference files to read**:
   - `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
-  - `{PLUGIN_ROOT}/examples/build-browser-code-patterns.md` — browser-specific code patterns for all project files
+  - `{PLUGIN_ROOT}/templates/build-browser-code-patterns.md` — browser-specific code patterns for all project files
 
   **Faithful to exploration report** — `on_workflow` in `agents.py` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.
 

@@ -41,9 +41,29 @@ claude plugin install /path/to/AmphiLoop
 
 Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 
+#### `/AmphiLoop:build`
+
+领域无关的通用流水线。描述任意任务，列出 agent 应读取的领域参考（SKILL、CLI 帮助、SDK 文档、风格指南），然后要求生成一个可运行项目：
+
+```
+/AmphiLoop:build
+
+我想把 ~/data/inputs 下所有 `orders_*.csv` 汇总成一个 summary.csv —
+按 customer 聚合出每个客户的总额。
+```
+
+**执行流程：**
+
+1. **Initialize Task** — 生成 `TASK.md` 模板，用户填写目标、预期输出、**领域参考**
+2. **Configure Pipeline** — 项目模式（Workflow / Amphiflow）与按需的 LLM 配置
+3. **Setup Environment** — 检查 `uv`，执行 `uv init`
+4. **Explore** — 委派 `amphibious-explore` agent 读取用户提供的领域参考并探索环境
+5. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
+6. **Verify** — 委派 `amphibious-verify` agent 注入调试插桩、运行项目、验证结果
+
 #### `/AmphiLoop:build-browser`
 
-描述一个浏览器自动化任务，并要求生成一个稳定可运行的项目：
+`/build` 的浏览器领域特化版本。已为浏览器领域预先蒸馏好领域上下文（观察协议、代码模式、验证规则），你只需描述浏览器自动化任务：
 
 ```
 /AmphiLoop:build-browser
@@ -56,13 +76,7 @@ Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 1. **浏览器自动化任务** — 在目标网站上要做什么（导航、点击、提取等）
 2. **生成稳定项目的请求** — 你需要一个能可靠运行的程序/项目
 
-**执行流程：**
-
-1. **Parse** — 从任务描述中提取 URL、目标和预期输出
-2. **Setup** — 检查环境（uv、依赖、`.env`）
-3. **Explore** — 委派 `amphibious-explore` agent 通过 CLI 系统性探索目标网站
-4. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
-5. **Verify** — 委派 `amphibious-verify` agent 注入调试插桩、运行项目、验证结果
+执行流程与 `/build` 对齐，但 Phase 2 额外询问浏览器环境模式（Default / Isolated），Phases 4–6 向各 agent 传递预蒸馏的浏览器领域上下文。
 
 ### Agents
 
@@ -102,10 +116,11 @@ AmphiLoop/
 │   ├── amphibious-code.md       #   代码生成专家
 │   └── amphibious-verify.md     #   项目验证专家
 ├── commands/                    # 用户可调用的工作流
-│   └── build-browser.md         #   端到端流水线
-├── examples/                    # 静态示例文档（不会被自动扫描）
-│   ├── build-browser-code-patterns.md
-│   └── build-browser-task-template.md
+│   ├── build.md                 #   领域无关的通用流水线
+│   └── build-browser.md         #   浏览器领域流水线
+├── templates/                   # 命令使用的静态模板（不会被自动扫描）
+│   ├── build-task-template.md         #   /build 与 /build-browser 的统一 TASK.md 模板
+│   └── build-browser-code-patterns.md #   浏览器领域的代码模式
 ├── hooks/                       # 自动加载的事件处理器
 │   └── hooks.json
 └── scripts/                     # Hook 与工具脚本

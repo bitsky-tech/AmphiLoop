@@ -60,7 +60,7 @@ Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 
 1. **Parse** — 从任务描述中提取 URL、目标和预期输出
 2. **Setup** — 检查环境（uv、依赖、`.env`）
-3. **Explore** — 委派 `browser-explorer` agent 通过 CLI 系统性探索目标网站
+3. **Explore** — 委派 `amphibious-explore` agent 通过 CLI 系统性探索目标网站
 4. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
 5. **Verify** — 委派 `amphibious-verify` agent 注入调试插桩、运行项目、验证结果
 
@@ -70,7 +70,7 @@ Agents 是由 commands 调度的执行专家，不由用户直接调用：
 
 | Agent | 功能 |
 |-------|------|
-| **browser-explorer** | 通过 CLI 系统性探索网站，生成结构化的探索报告和快照 |
+| **amphibious-explore** | 通过领域工具集系统性探索目标环境，生成带稳定性标注的可执行操作序列与关键快照 |
 | **amphibious-code** | 根据任务描述和探索报告生成完整的 bridgic-amphibious 项目 |
 | **amphibious-verify** | 注入调试插桩、监控运行、验证结果、清理环境 |
 
@@ -98,7 +98,7 @@ AmphiLoop/
 │   ├── bridgic-amphibious/      #   双模 Agent 框架
 │   └── bridgic-llms/            #   LLM 提供商集成
 ├── agents/                      # 执行方法论（3 个 agents）
-│   ├── browser-explorer.md      #   CLI 探索专家
+│   ├── amphibious-explore.md    #   抽象探索方法论
 │   ├── amphibious-code.md       #   代码生成专家
 │   └── amphibious-verify.md     #   项目验证专家
 ├── commands/                    # 用户可调用的工作流

@@ -16,7 +16,7 @@ AmphiLoop/
 │   ├── bridgic-amphibious/            ← dual-mode agent framework
 │   └── bridgic-llms/                  ← LLM providers and initialization
 ├── agents/                            ← execution methodology: "how to do it well"
-│   ├── browser-explorer.md            ← CLI exploration expertise
+│   ├── amphibious-explore.md          ← abstract exploration methodology
 │   ├── amphibious-code.md             ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
@@ -42,7 +42,7 @@ AmphiLoop/
 | Type | Purpose | Example |
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
-| **Agent** | Deep execution methodology — delegated by commands | browser-explorer, amphibious-code, amphibious-verify |
+| **Agent** | Deep execution methodology — delegated by commands | amphibious-explore, amphibious-code, amphibious-verify |
 | **Command** | Multi-step orchestrator invoked by user | /build-browser |
 
 ## Installation
@@ -65,7 +65,7 @@ claude plugin install AmphiLoop
 
 | Agent | When to Use |
 |-------|-------------|
-| **browser-explorer** | Systematically explore a website via CLI, produce structured exploration report |
+| **amphibious-explore** | Systematically explore a target environment via a domain toolset, produce an executable plan with stability-annotated operations |
 | **amphibious-code** | Generate a complete bridgic-amphibious project from a task description with optional domain context |
 | **amphibious-verify** | Verify a generated amphibious project: inject debug instrumentation, run with monitoring, validate results, clean up |
 

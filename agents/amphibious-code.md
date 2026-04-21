@@ -160,9 +160,9 @@ The output directory for **logs produced by the generated project at runtime** â
 
 The output directory for **task results produced by the generated project at runtime** â€” extracted data, generated files, persisted records, and anything else that represents the project's answer to its task. All task outputs must be written here under a relative path like `result/<filename>`. If the task description specifies an output filename, place it under `result/` rather than the project root or anywhere else. Uniform placement here is what lets downstream orchestration collect and compare results across projects.
 
-## Phase 3: Validate Generated Helpers and Tools
+## Phase 3: Validate Generated Helpers
 
-After all code is generated, validate each helper function in `helpers.py` and each task tool in `tools.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
+After all code is generated, validate each helper function in `helpers.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
 
 ```bash
 # Such as:

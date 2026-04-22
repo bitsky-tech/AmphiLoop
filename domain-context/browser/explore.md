@@ -2,8 +2,7 @@
 
 ## Domain reference files to read
 
-- `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-guide.md` — CLI tool names and usage.
-- `{PLUGIN_ROOT}/skills/bridgic-browser/references/env-vars.md` — environment variables that affect browser behavior (headless mode, channel selection, stealth mode, etc.).
+- `{PLUGIN_ROOT}/skills/bridgic-browser/SKILL.md` — browser skill definitions and usage.
 
 ## Observation protocol
 

@@ -154,7 +154,7 @@ The scaffold from Phase 1 leaves the project without an entry point. In this fin
 
 1. **Args parsing (only when the task requires it).** If the task description requires the generated project to accept runtime parameters (input files, output directories, mode selection, etc.), parse them with `argparse`. If no such requirement exists, omit argparse — do not add it for its own sake.
 
-2. **Use `OpenAILlm` + `OpenAIConfiguration` for LLM initialization.** The initialization pattern is fixed: import from `bridgic.llms.openai`, pass config values from `config.py`, set `temperature=0.0` for deterministic workflows.
+2. **(IF REQUIRED) Use `OpenAILlm` + `OpenAIConfiguration` for LLM initialization.** The initialization pattern is fixed: import from `bridgic.llms.openai`, pass config values from `config.py`, set `temperature=0.0` for deterministic workflows. (ESLE) If the task does not require an LLM, or explicitly states that no LLM should be used, omit all LLM-related code — do not import `OpenAILlm` or `OpenAIConfiguration`, and pass `llm=None` to the agent constructor. This makes it explicit in the code that no LLM is involved.
 ```python
 # Such as:
 from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration

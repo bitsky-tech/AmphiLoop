@@ -20,11 +20,11 @@ AmphiLoop/
 │   ├── amphibious-code.md             ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
-│   ├── build.md                       ← /build pipeline (domain-agnostic)
-│   └── build-browser.md               ← /build-browser pipeline (browser-domain specialization)
+│   └── build.md                       ← /build pipeline (domain-agnostic; accepts --<domain>)
+├── domain-context/                    ← pre-distilled per-domain context injected by /build
+│   └── browser/                       ← intent.md, config.md, explore.md, code.md, verify.md
 ├── templates/                         ← static templates read by commands (not auto-scanned by Claude Code)
-│   ├── build-task-template.md         ← unified TASK.md template (used by /build and /build-browser Phase 1)
-│   └── build-browser-code-patterns.md ← browser-specific code patterns (loaded by /build-browser Phase 5)
+│   └── build-task-template.md         ← unified TASK.md template (used by /build Phase 1)
 ├── hooks/                             ← auto-loaded by Claude Code
 │   └── hooks.json                     ← hook definitions
 └── scripts/
@@ -44,7 +44,8 @@ AmphiLoop/
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
 | **Agent** | Deep execution methodology — delegated by commands | amphibious-explore, amphibious-code, amphibious-verify |
-| **Command** | Multi-step orchestrator invoked by user | /build, /build-browser |
+| **Command** | Multi-step orchestrator invoked by user | /build |
+| **Domain Context** | Pre-distilled per-domain rules (`intent.md`, `config.md`, `explore.md`, `code.md`, `verify.md`) injected by `/build` when a domain is selected explicitly via `--<domain>` or auto-detected from `TASK.md` | domain-context/browser |
 
 ## Installation
 
@@ -74,5 +75,4 @@ claude plugin install AmphiLoop
 
 | Command | When to Use |
 |---------|-------------|
-| **/build** | Turn any task into a working bridgic-amphibious project; users supply domain references (SKILLs, CLIs, SDK docs, style guides) and the pipeline orchestrates mode selection → explore → code → verify |
-| **/build-browser** | Browser-domain specialization of `/build` — pre-distills browser domain context (observation protocol, code patterns, verification rules) |
+| **/build** | Unified entry point. Turn any task into a working bridgic-amphibious project. Accepts an optional domain flag (`/build --browser`) to inject pre-distilled context from `domain-context/<domain>/`. Without a flag, auto-detects the domain from `TASK.md` (or falls back to a generic flow). Users may additionally supply their own domain references in `TASK.md`. |

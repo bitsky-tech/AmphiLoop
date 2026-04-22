@@ -26,13 +26,13 @@ These three concerns come together in **one artifact**: the pseudocode operation
 
 You receive from the calling command:
 
-- **Task description** — goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect; such cited references.
+- **Task description** — goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect.
 - **Domain context** — (optional): Domain-specific instructions provided by the command — tool setup patterns, observation/cleanup protocols, When provided, domain context takes precedence over the general rules below for domain-specific concerns.
 - **Auxiliary context** (optional): Auxiliary information about the target system that can guide code generation (e.g., operation sequences, identifier stability, edge cases)
 
 ## Analyse Task
 
-### From task-description cite external references (distill if present)
+### Distill cited external references in the task description
 
 The task description may cite external references — skills, style guides, CLI docs, SDK docs — that the executor must respect. For each cited reference, work through both lenses. They are **not mutually exclusive**: a single reference may blend both; read each through each lens in turn. When multiple references are in play, note each directive's source so conflicting prescriptions can be reconciled later.
 
@@ -70,9 +70,9 @@ With the domain context understood, decompose the task itself. Produces the pseu
 For every step, follow the loop:
 
 1. **Observe** — enter every iteration holding a **fresh view** of the environment's current state, Decide reasons about reality rather than memory. There are two ways to satisfy this:
-   - *Default — run the observation command.* Invoke the observation command(s) derived in Explore Domain Context at the start of the iteration. This is the safe path and is the expected behavior unless the shortcut below clearly applies.
+   - *Default — run the observation command.* Invoke the observation command(s) derived in **Analyse Task** at the start of the iteration. This is the safe path and is the expected behavior unless the shortcut below clearly applies.
    - *Shortcut — reuse the prior Act's return.* If the previous iteration's Act already returned a value that fully describes the post-action state, you are already holding a fresh view and may proceed directly to make decision without a separate observation call. 
-2. **Decide** — compare observed state against the task goal; pick the next action from the tool's action vocabulary (consult SKILL.md / `--help` / SDK docs as needed). Respect any guidance-based directives extracted in Explore Domain Context.
+2. **Decide** — compare observed state against the task goal; pick the next action from the tool's action vocabulary (consult SKILL.md / `--help` / SDK docs as needed). Respect any guidance-based directives extracted in **Analyse Task**.
 3. **Act** — execute the chosen action.
 4. **Record** — capture the operation, its parameters, and each parameter's stability classification (see below).
 
@@ -143,50 +143,65 @@ Otherwise, this section is not necessary.
 
 A pseudocode-style list. Use indentation and control-flow keywords (`FOR`, `WHILE`, `IF` / `ELSE`) to express loops, conditions, and nesting.
 
+**Format**: each step line carries **only the action** (verb + brief target name). All parameters, identifiers, stability tags, and behavioral notes go on `#` comment lines directly below the step. This keeps the action skeleton scannable on its own and pushes detail into a uniform sub-block.
+
 **Example (browser domain)**:
 
 ```
-1. open --headed <url>
+1. open
+   # url=<url>
+   # mode=headed
 2. IF login page detected:
-   2.1 HUMAN: log in manually and tell me when the dashboard is visible
-3. fill start_date [ref=5dc3463e STABLE]
+   2.1 HUMAN: log in manually
+      # resume signal: dashboard is visible
+3. fill start_date
+   # ref=5dc3463e STABLE
    # "开始日期" textbox, YYYY-MM-DD
-4. fill end_date [ref=a9cca048 STABLE]
+4. fill end_date
+   # ref=a9cca048 STABLE
    # "结束日期" textbox, YYYY-MM-DD
-5. click search [ref=4084c4ad STABLE]
+5. click search
+   # ref=4084c4ad STABLE
    # results refresh in-place
 6. WHILE next_page not disabled:
-   6.1 FOR each row in current_page (VOLATILE refs)
-      6.1.1 extract detail_url from link
+   6.1 FOR each row in current_page:
+      # row refs VOLATILE
+      6.1.1 extract detail_url
+         # source: row's link
          # URL pattern: /detail?order_id=...
       6.1.2 open detail_url in new tab
       6.1.3 extract detail fields
-         # order_no, amount, ...
+         # fields: order_no, amount, ...
       6.1.4 close tab
-   6.2 click next_page [ref=cbac3327 STABLE]
+   6.2 click next_page
+      # ref=cbac3327 STABLE
 ```
 
 **Example (filesystem domain, hypothetical)**:
 
 ```
-1. list entries in /input [glob=*.csv STABLE]
-2. FOR each file in matched (VOLATILE paths)
+1. list entries
+   # path=/input
+   # glob=*.csv STABLE
+2. FOR each file in matched:
+   # paths VOLATILE
    2.1 read file
    2.2 parse rows
-   2.3 write result to /output/<file.stem>.json
+   2.3 write result
+      # path=/output/<file.stem>.json
       # <file.stem> VOLATILE — derived from each matched file
 ```
 
 **Rules**:
 
 - **Only critical operations**: the minimal sequence needed to achieve the task. Do not include observation, waiting, cleanup, or internal file reads — those are implicit in the loop, not part of the plan.
-- **Inline stability annotations**: after each parameter that carries a stability classification, append `[<identifier> <STABILITY>]` using the domain vocabulary, on the same line as the operation.
-- **Behavioral notes as `#` comments**: every comment goes on its own line directly below the step, with its `#` indented **three spaces deeper than the step's leading indent**, one observation per line. Never place comments at line-end, and never align comments across lines by column.
+- **Action-only step lines**: the step line is `<number>. <verb> <target>` (or a control-flow keyword). No values, refs, stability tags, or notes on the step line.
+- **Parameters and notes as `#` comments**: every parameter (`key=value`), stability tag (`<identifier> STABLE` / `VOLATILE`), and behavioral note goes on its own `#` line directly below the step. Indent the `#` **three spaces deeper than the step's leading indent**. One fact per line. Never place comments at line-end; never align comments across lines by column.
 - **Control flow**: indent to show nesting; use explicit keywords:
   - `WHILE <condition>:` — condition-driven repetition: repeat until a termination signal is observed (total iterations unknown upfront).
   - `FOR each <item> in <collection>:` — collection-driven iteration: enumerate a known/visible set.
   - `IF <condition>:` / `ELSE:` — branch on observed state. `ELSE:` sits at the same indent as `IF`; sub-numbers continue sequentially under the same parent.
-- **Human handoffs**: `HUMAN:` is a special marker. Describe what the human must do and the signal to resume.
+- **Human handoffs**: `HUMAN:` is a special marker. Describe what the human must do on the step line; put the resume signal on a `#` line below.
 
 ### 3. Artifact Files
 

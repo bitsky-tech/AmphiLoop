@@ -33,7 +33,7 @@ git clone https://github.com/bitsky-tech/AmphiLoop.git
 claude plugin install /path/to/AmphiLoop
 ```
 
-After installation, skills, agents, and commands (e.g. `/build-browser`) are automatically available in Claude Code.
+After installation, skills, agents, and commands (e.g. `/build`) are automatically available in Claude Code.
 
 ## Usage
 
@@ -43,7 +43,7 @@ Commands are user-invocable workflows. Invoke them with the `/` prefix:
 
 #### `/AmphiLoop:build`
 
-Domain-agnostic pipeline. Describe any task, list the domain references the agents should read (SKILLs, CLI help, SDK docs, style guides), and ask to generate a runnable project:
+Unified pipeline. Describe any task, list the domain references the agents should read (SKILLs, CLI help, SDK docs, style guides), and ask to generate a runnable project:
 
 ```
 /AmphiLoop:build
@@ -52,31 +52,25 @@ I want to aggregate all `orders_*.csv` files under ~/data/inputs into a single
 summary.csv — one row per customer with totals.
 ```
 
-**What happens under the hood:**
-
-1. **Initialize Task** — Writes a `TASK.md` template where you fill in goal, expected output, and **Domain References**
-2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow) and LLM config if needed
-3. **Setup Environment** — Checks `uv`, runs `uv init`
-4. **Explore** — Delegates to `amphibious-explore` agent, which reads your domain references and probes the environment
-5. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
-6. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
-
-#### `/AmphiLoop:build-browser`
-
-Browser-domain specialization of `/build`. Pre-distills the browser domain context (observation protocol, code patterns, verification rules) so you only need to describe the browser automation task:
+**Domain flag (optional)** — append `--<domain>` to inject pre-distilled domain context from `domain-context/<domain>/`. Currently supported: `--browser`.
 
 ```
-/AmphiLoop:build-browser
+/AmphiLoop:build --browser
 
 Go to https://example.com, search for "product", and extract the first 5 results.
 I want a project that can run this reliably.
 ```
 
-Your input should contain two key intents:
-1. **A browser automation task** — what to do on the target website (navigate, click, extract, etc.)
-2. **A request to generate a stable project** — you want a working program/project that can run reliably
+Without a flag, `/build` auto-detects the domain from `TASK.md` (and falls back to a generic flow if none matches). Users can always supply additional domain references in `TASK.md`.
 
-The under-the-hood phases mirror `/build`, but Phase 2 also asks about browser environment mode (Default vs Isolated), and Phases 4–6 pass pre-distilled browser-specific domain context to the agents.
+**What happens under the hood:**
+
+1. **Initialize Task** — Writes a `TASK.md` template where you fill in goal, expected output, and **Domain References**; auto-detects the domain if no flag was given
+2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow), LLM config if needed, plus any domain-specific configuration (e.g. browser environment mode when `--browser` is active)
+3. **Setup Environment** — Checks `uv`, runs `uv init`
+4. **Explore** — Delegates to `amphibious-explore` agent, which reads your domain references and probes the environment
+5. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
+6. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
 
 ### Agents
 
@@ -116,11 +110,9 @@ AmphiLoop/
 │   ├── amphibious-code.md       #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
-│   ├── build.md                 #   Domain-agnostic pipeline
-│   └── build-browser.md         #   Browser-domain pipeline
+│   └── build.md                 #   Unified pipeline (accepts optional --<domain> flag)
 ├── templates/                   # Static templates read by commands (not auto-scanned)
-│   ├── build-task-template.md         #   Unified TASK.md template for /build and /build-browser
-│   └── build-browser-code-patterns.md #   Browser-specific code patterns
+│   └── build-task-template.md         #   Unified TASK.md template used by /build
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations

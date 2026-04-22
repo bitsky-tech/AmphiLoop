@@ -33,7 +33,7 @@ git clone https://github.com/bitsky-tech/AmphiLoop.git
 claude plugin install /path/to/AmphiLoop
 ```
 
-安装后，skills、agents 和 commands（如 `/build-browser`）会自动在 Claude Code 中可用。
+安装后，skills、agents 和 commands（如 `/build`）会自动在 Claude Code 中可用。
 
 ## 使用
 
@@ -43,7 +43,7 @@ Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 
 #### `/AmphiLoop:build`
 
-领域无关的通用流水线。描述任意任务，列出 agent 应读取的领域参考（SKILL、CLI 帮助、SDK 文档、风格指南），然后要求生成一个可运行项目：
+统一流水线。描述任意任务，列出 agent 应读取的领域参考（SKILL、CLI 帮助、SDK 文档、风格指南），然后要求生成一个可运行项目：
 
 ```
 /AmphiLoop:build
@@ -52,31 +52,25 @@ Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 按 customer 聚合出每个客户的总额。
 ```
 
-**执行流程：**
-
-1. **Initialize Task** — 生成 `TASK.md` 模板，用户填写目标、预期输出、**领域参考**
-2. **Configure Pipeline** — 项目模式（Workflow / Amphiflow）与按需的 LLM 配置
-3. **Setup Environment** — 检查 `uv`，执行 `uv init`
-4. **Explore** — 委派 `amphibious-explore` agent 读取用户提供的领域参考并探索环境
-5. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
-6. **Verify** — 委派 `amphibious-verify` agent 注入调试插桩、运行项目、验证结果
-
-#### `/AmphiLoop:build-browser`
-
-`/build` 的浏览器领域特化版本。已为浏览器领域预先蒸馏好领域上下文（观察协议、代码模式、验证规则），你只需描述浏览器自动化任务：
+**领域标志（可选）** — 在命令后追加 `--<domain>`，即可注入 `domain-context/<domain>/` 下预先蒸馏好的领域上下文。当前已支持：`--browser`。
 
 ```
-/AmphiLoop:build-browser
+/AmphiLoop:build --browser
 
 打开 https://example.com，搜索 "product"，提取前 5 条结果。
 我需要一个能稳定运行的项目。
 ```
 
-你的输入应包含两个关键意图：
-1. **浏览器自动化任务** — 在目标网站上要做什么（导航、点击、提取等）
-2. **生成稳定项目的请求** — 你需要一个能可靠运行的程序/项目
+不带标志时，`/build` 会根据 `TASK.md` 自动识别领域（若没有匹配则回退到通用流程）。用户可随时在 `TASK.md` 中补充额外领域参考。
 
-执行流程与 `/build` 对齐，但 Phase 2 额外询问浏览器环境模式（Default / Isolated），Phases 4–6 向各 agent 传递预蒸馏的浏览器领域上下文。
+**执行流程：**
+
+1. **Initialize Task** — 生成 `TASK.md` 模板，用户填写目标、预期输出、**领域参考**；若未带标志则自动识别领域
+2. **Configure Pipeline** — 项目模式（Workflow / Amphiflow）、按需的 LLM 配置，以及任何领域特定配置（例如 `--browser` 模式下询问浏览器环境模式）
+3. **Setup Environment** — 检查 `uv`，执行 `uv init`
+4. **Explore** — 委派 `amphibious-explore` agent 读取用户提供的领域参考并探索环境
+5. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
+6. **Verify** — 委派 `amphibious-verify` agent 注入调试插桩、运行项目、验证结果
 
 ### Agents
 
@@ -116,11 +110,9 @@ AmphiLoop/
 │   ├── amphibious-code.md       #   代码生成专家
 │   └── amphibious-verify.md     #   项目验证专家
 ├── commands/                    # 用户可调用的工作流
-│   ├── build.md                 #   领域无关的通用流水线
-│   └── build-browser.md         #   浏览器领域流水线
+│   └── build.md                 #   统一流水线（可选 --<domain> 标志）
 ├── templates/                   # 命令使用的静态模板（不会被自动扫描）
-│   ├── build-task-template.md         #   /build 与 /build-browser 的统一 TASK.md 模板
-│   └── build-browser-code-patterns.md #   浏览器领域的代码模式
+│   └── build-task-template.md         #   /build 使用的统一 TASK.md 模板
 ├── hooks/                       # 自动加载的事件处理器
 │   └── hooks.json
 └── scripts/                     # Hook 与工具脚本

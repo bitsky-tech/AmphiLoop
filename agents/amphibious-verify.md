@@ -94,7 +94,7 @@ If there are any points in the workflow that require human interaction, insert a
 
 ### 1.3 Loop Slicing
 
-For each dynamic list loop in `on_workflow`, insert a slice immediately before the `for` statement to limit iterations during verification.
+For each dynamic list loop in `on_workflow`, **insert a slice immediately before the `for` statement to limit iterations during verification.**
 
 **Pattern**:
 

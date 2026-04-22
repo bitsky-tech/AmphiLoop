@@ -27,7 +27,7 @@ You receive from the calling command:
 - **Domain context** (optional): Domain-specific instructions provided by the command — tool setup patterns, observation patterns, state tracking patterns, per-file overrides, and reference files to read. When provided, domain context takes precedence over the general rules below for domain-specific concerns.
 - **Auxiliary context** (optional): Auxiliary information about the target system that can guide code generation (e.g., operation sequences, identifier stability, edge cases)
 
-## Phase 1: Scaffold via CLI (MANDATORY)
+## Phase 1: Scaffold via bridgic-amphibious CLI (MANDATORY)
 
 **You MUST run this command before writing any code.** Do not create files manually.
 
@@ -35,11 +35,9 @@ You receive from the calling command:
 bridgic-amphibious create -n <project-name> --task "<task description>"
 ```
 
-This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `main.py`, `skills/`, `result/`, `log/`.
+This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `helpers.py`, `skills/`, `result/`, `log/` under a new directory named `<project-name>/`. The generated files contain boilerplate code and comments that guide the implementation in the next phases. **After the scaffold is created**, adapt each generated file based on the task description, domain context, and auxiliary context.
 
-**After the scaffold is created**, adapt each generated file based on the task description, domain context, and auxiliary context.
-
-## Phase 2: Generate Code (Per-File Rules)
+## Phase 2: Generate bridgic-amphibious project (Per-File Rules)
 
 ### agents.py
 
@@ -127,6 +125,31 @@ LLM_MODEL = os.getenv("LLM_MODEL")
 ...  # Other domain-specific config variables
 ```
 
+### log/
+
+The output directory for **logs produced by the generated project at runtime** — agent traces, tool logs, debug output emitted while the project solves its task. Configure logging in `main.py` to write log files into this directory (relative path `log/`). Do not emit logs to `/tmp`, the user's home, or stdout only — they must land under `log/` so downstream orchestration (aggregation, tailing, CI capture) treats every generated project uniformly.
+
+### result/
+
+The output directory for **task results produced by the generated project at runtime** — extracted data, generated files, persisted records, and anything else that represents the project's answer to its task. All task outputs must be written here under a relative path like `result/<filename>`. If the task description specifies an output filename, place it under `result/` rather than the project root or anywhere else. Uniform placement here is what lets downstream orchestration collect and compare results across projects.
+
+## Phase 3: Validate Generated Helpers
+
+After all code is generated, validate each helper function in `helpers.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
+
+```bash
+# Such as:
+uv run python -c "
+from helpers import extract_items
+snapshot = open('.bridgic/explore/snapshot_xxx.txt').read()
+print(extract_items(snapshot))
+"
+```
+
+## Phase 4: Write Project Entry Point & README
+
+The scaffold from Phase 1 leaves the project without an entry point. In this final phase you create `main.py` (the runnable entry) and `README.md` (how to run it) so the project becomes executable end-to-end.
+
 ### main.py
 
 1. **Args parsing (only when the task requires it).** If the task description requires the generated project to accept runtime parameters (input files, output directories, mode selection, etc.), parse them with `argparse`. If no such requirement exists, omit argparse — do not add it for its own sake.
@@ -152,27 +175,16 @@ llm = OpenAILlm(
 
 4. **Mode selection (optional — defaults to `RunMode.AUTO`).** The mode determines execution flow and error handling. If the task or domain context specifies a fixed mode, pass it explicitly to `arun()`: `RunMode.WORKFLOW` (pure workflow), `RunMode.AGENT` (pure LLM-driven), or `RunMode.AMPHIFLOW` (workflow-first with agent fallback — requires both `on_workflow` and `on_agent`). If no mode is specified, omit the argument and `arun()` will pick the mode from which template methods are overridden.
 
-### log/
+5. **Logging configuration.** Wire Python logging in `main.py` so log files land under the project's `log/` directory (relative path), per the `### log/` rules above. This is the only place logging should be configured — keep `agents.py` / `tools.py` free of logging setup.
 
-The output directory for **logs produced by the generated project at runtime** — agent traces, tool logs, debug output emitted while the project solves its task. Configure logging in `main.py` to write log files into this directory (relative path `log/`). Do not emit logs to `/tmp`, the user's home, or stdout only — they must land under `log/` so downstream orchestration (aggregation, tailing, CI capture) treats every generated project uniformly.
+6. **Async entry boilerplate.** Wrap the runnable code in an `async def main(): ...` and invoke it via `asyncio.run(main())` under `if __name__ == "__main__":`.
 
-### result/
+### README.md
 
-The output directory for **task results produced by the generated project at runtime** — extracted data, generated files, persisted records, and anything else that represents the project's answer to its task. All task outputs must be written here under a relative path like `result/<filename>`. If the task description specifies an output filename, place it under `result/` rather than the project root or anywhere else. Uniform placement here is what lets downstream orchestration collect and compare results across projects.
+Written **after** `main.py` so the run instructions reflect the actual entry script. Keep it short and operational — enough that another developer can clone and run the project without reading the code. Include:
 
-## Phase 3: Validate Generated Helpers
-
-After all code is generated, validate each helper function in `helpers.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
-
-```bash
-# Such as:
-uv run python -c "
-from helpers import extract_items
-snapshot = open('.bridgic/explore/snapshot_xxx.txt').read()
-print(extract_items(snapshot))
-"
-```
-
-## Phase 4: Write Project README
-
-Write a `README.md` that explains how to run the project. This is the final step after all code is generated and validated. The README should be clear enough for another developer to understand the project purpose and how to execute it without reading the code.
+1. **Project purpose** — one or two sentences derived from the task description.
+2. **Prerequisites** — Python version, `uv`, and any domain-specific tools the project depends on (e.g., a CLI installed in Phase 3).
+3. **Setup** — `uv sync` (or equivalent), then create `.env` and list the required variables (`LLM_API_BASE`, `LLM_API_KEY`, `LLM_MODEL`, plus any domain-specific ones added to `config.py`). Do **not** include real secret values.
+4. **Run** — the exact launch command (typically `uv run python main.py`, plus any args parsed in step 1 above).
+5. **Outputs** — where results land (`result/`) and where logs land (`log/`), so users know where to look after a run.

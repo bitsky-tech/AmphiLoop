@@ -23,7 +23,7 @@ Before starting, read and load all dependent skills listed below.
 ## Input
 
 You receive from the calling command:
-- **Task description**: Goal, expected output, constraints
+- **Task description**: goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect; such cited references.
 - **Domain context** (optional): Domain-specific verification rules — helper check methods, expected output indicators, domain-specific error patterns. When provided, domain context takes precedence over the general rules below for domain-specific concerns.
 - **Auxiliary context** (optional): Supporting information for verification (e.g., pre-analysis reports, sample data, expected output indicators)
 

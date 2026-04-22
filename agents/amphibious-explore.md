@@ -26,17 +26,17 @@ These three concerns come together in **one artifact**: the pseudocode operation
 
 You receive from the calling command:
 
-- **Task description** — goal, expected output, constraints.
-- **Domain context** — dynamically injected by the caller. Provides task-specific requirements, environmental details, and any prior observations relevant to the exploration (such as some skills, CLI tools, docs etc.). Complements the task description with additional constraints, known patterns, or edge cases the exploration must account for.
-- **Auxiliary context** (optional) — prior hints: environment details, known operation sequences, identifier stability, edge cases.
+- **Task description** — goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect; such cited references.
+- **Domain context** — (optional): Domain-specific instructions provided by the command — tool setup patterns, observation/cleanup protocols, When provided, domain context takes precedence over the general rules below for domain-specific concerns.
+- **Auxiliary context** (optional): Auxiliary information about the target system that can guide code generation (e.g., operation sequences, identifier stability, edge cases)
 
-## Explore Domain Context
+## Analyse Task
 
-Before attempting the task, work through every piece of material the caller provided as domain context. Domain context arrives in two flavors — and the two are **not mutually exclusive**: the caller may bundle multiple pieces of material with different mixes, and a single piece may itself blend both. Read each piece through both lenses in turn.
+### From task-description cite external references (distill if present)
 
-When multiple references are in play (whether purely operational, purely guidance, or mixed), note each directive's source so conflicting prescriptions can be reconciled later.
+The task description may cite external references — skills, style guides, CLI docs, SDK docs — that the executor must respect. For each cited reference, work through both lenses. They are **not mutually exclusive**: a single reference may blend both; read each through each lens in turn. When multiple references are in play, note each directive's source so conflicting prescriptions can be reconciled later.
 
-### A. Operational / tool-based material
+#### Operational / tool-based material
 
 References that teach *how to act on the environment* — framework manuals, CLI help pages, SDK docs (e.g., `playwright --help`, a `bridgic-browser` SKILL.md, a filesystem API reference). Your goal is to understand the tool well enough to drive the *Core Loop* with it, and in particular to **derive how the tool lets you observe the environment**. For each such reference:
 
@@ -48,7 +48,7 @@ References that teach *how to act on the environment* — framework manuals, CLI
 - Run the observation command(s) once to see the actual output shape and how identifiers appear.
 - Identify the cleanup command(s) that release resources when exploration ends.
 
-### B. Guidance-based material
+#### Guidance-based material
 
 References that prescribe *rules, patterns, or requirements* rather than tool mechanics — style guides, architectural constraints, domain DOs and DON'Ts, "in this project, X must always be written like Y" conventions. Your goal is to extract the directives that will shape how the plan is written. For each such reference:
 
@@ -56,9 +56,9 @@ References that prescribe *rules, patterns, or requirements* rather than tool me
 - Discard generic background that is not actionable for this task.
 - Preserve the directive verbatim or near-verbatim — do not paraphrase away its specificity.
 
-### Distilling the findings
+#### Distilling the findings
 
-Fold everything learned above into **Domain Guidance** (see Generate Report §1 for its shape). Keep terse — do not restate what the references already cover; record only what a future executor needs to act correctly.
+Fold everything learned above into additional subsections of **Domain Guidance** (see Generate Report §1 for its shape). Keep terse — do not restate what the references already cover; record only what a future executor needs to act correctly.
 
 
 ## Explore Task
@@ -69,9 +69,9 @@ With the domain context understood, decompose the task itself. Produces the pseu
 
 For every step, follow the loop:
 
-1. **Observe** — enter every iteration holding a **fresh view** of the environment's current state, so Decide reasons about reality rather than memory. There are two ways to satisfy this:
+1. **Observe** — enter every iteration holding a **fresh view** of the environment's current state, Decide reasons about reality rather than memory. There are two ways to satisfy this:
    - *Default — run the observation command.* Invoke the observation command(s) derived in Explore Domain Context at the start of the iteration. This is the safe path and is the expected behavior unless the shortcut below clearly applies.
-   - *Shortcut — reuse the prior Act's return.* If the previous iteration's Act already returned a value that fully describes the post-action state, you are already holding a fresh view and may proceed directly to Decide without a separate observation call. 
+   - *Shortcut — reuse the prior Act's return.* If the previous iteration's Act already returned a value that fully describes the post-action state, you are already holding a fresh view and may proceed directly to make decision without a separate observation call. 
 2. **Decide** — compare observed state against the task goal; pick the next action from the tool's action vocabulary (consult SKILL.md / `--help` / SDK docs as needed). Respect any guidance-based directives extracted in Explore Domain Context.
 3. **Act** — execute the chosen action.
 4. **Record** — capture the operation, its parameters, and each parameter's stability classification (see below).
@@ -132,16 +132,12 @@ Write `exploration_report.md` plus all saved artifact files. The report contains
 
 ### 1. Domain Guidance
 
-Distilled from Explore Domain Context. Include only the subsections justified by the material were actually given — omit any that do not apply. Keep each entry to a few lines and do not restate what the references already cover.
-
-**For operational / tool-based material:**
-
-- **Observation protocol** — the concrete command(s) that surface the current environment state.
-- **Cleanup protocol** — command(s) to release resources when a run ends.
-
-**For guidance-based material:**
-
-- **Applicable directives** — the rules, patterns, and constraints extracted from the references that the plan must respect (near-verbatim; do not paraphrase away specificity). Cite the source reference alongside each directive when multiple sources are in play.
+Based on the results of the Analyse Task, relevant insights have been obtained through analysis. 
+- If there is any, add this section to the report and explain. Keep each entry to a few lines: 
+   - **Observation protocol** — the concrete command(s) that surface the current environment state.
+   - **Cleanup protocol** — command(s) to release resources when a run ends.
+   - **Applicable directives** — rules, patterns, and constraints the plan must respect (near-verbatim; do not paraphrase away specificity). Cite the source reference when multiple are in play.
+Otherwise, this section is not necessary. 
 
 ### 2. Operation Sequence
 

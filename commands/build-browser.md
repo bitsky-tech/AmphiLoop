@@ -133,30 +133,29 @@ Pass to the agent:
   - Output directory `{PROJECT_ROOT}/.bridgic/explore/`
   - The agent must record the full browser launch parameters used in this phase (headless, channel, args, etc., excluding `user-data-dir`) into the exploration report.
   - **Browser environment mode** from Phase 2: if **Isolated** mode is selected, pass `user-data-dir` = `{PROJECT_ROOT}/.bridgic/browser/`. The agent must create this directory before launching the browser, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up, so that subsequent phases start with a clean browser state.
-- **Domain context** (browser automation, pre-distilled):
+- **Domain context** (browser automation, pre-distilled — copy verbatim into §1):
 
-   The **Observation protocol**, **Cleanup protocol**, and **Applicable directives** below are the distilled output of the usual `Explore Domain Context` analysis for this domain.
-   - Include them **verbatim** in the report's §1 Domain Guidance — do not re-derive them from the skill.
-   - Use the Observation protocol as the Core Loop's observation command throughout exploration.
-   - Still read the `bridgic-browser` skill at `{PLUGIN_ROOT}/skills/bridgic-browser/SKILL.md` — you will need it to set up the execution environment (dependencies + installation) and for the full CLI action vocabulary used during exploration.
+  **Domain reference files to read**:
+  - `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-guide.md` for CLI tool names and usage
+  - `{PLUGIN_ROOT}/skills/bridgic-browser/references/env-vars.md` for environment variables that affect browser behavior (e.g., headless mode, channel selection, stealth mode, etc.)
 
-   **Observation protocol** — run both commands together before every action to capture the current environment state:
+  **Observation protocol** — run both commands together before every action to capture the current environment state:
 
-   ```bash
-   uv run bridgic-browser snapshot       # current tab's page state
-   uv run bridgic-browser tabs           # all open tabs + which is active
-   ```
+  ```bash
+  uv run bridgic-browser snapshot       # current tab's page state
+  uv run bridgic-browser tabs           # all open tabs + which is active
+  ```
 
-   - Use `tabs` to track open tabs and identify the active tab so subsequent actions target the correct page context.
-   - `snapshot` has two output modes (the CLI decides automatically):
-     - **Minimal content** — the full snapshot is printed to stdout; locate target elements directly in the terminal output.
-     - **Substantial content** — only a file path is printed; search for task-related keywords in that file, or read it in full to find the target elements and their refs.
+  - Use `tabs` to track open tabs and identify the active tab so subsequent actions target the correct page context.
+  - `snapshot` has two output modes (the CLI decides automatically):
+    - **Minimal content** — the full snapshot is printed to stdout; locate target elements directly in the terminal output.
+    - **Substantial content** — only a file path is printed; search for task-related keywords in that file, or read it in full to find the target elements and their refs.
 
-   **Cleanup protocol** — run once at the end of exploration to release all browser processes started by `bridgic-browser`:
+  **Cleanup protocol** — run once at the end of exploration to release all browser processes started by `bridgic-browser`:
 
-   ```bash
-   uv run bridgic-browser close
-   ```
+  ```bash
+  uv run bridgic-browser close
+  ```
 
 **Do not proceed to Phase 5 until complete.**
 
@@ -177,7 +176,7 @@ Pass to the agent:
 - **Domain context** (browser automation) — browser-specific instructions that override or supplement the `amphibious-code` agent's general per-file rules:
 
   **Domain reference files to read**:
-  - `bridgic-browser` skill — `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
+  - `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` for SDK tool names and usage
   - `{PLUGIN_ROOT}/templates/build-browser-code-patterns.md` — browser-specific code patterns for all project files
 
   **Faithful to exploration report** — `on_workflow` in `agents.py` must implement every numbered step (and sub-step) from the report's "Operation Sequence" — same order, same refs, same values.

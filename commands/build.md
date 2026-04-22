@@ -102,11 +102,7 @@ bash "{PLUGIN_ROOT}/scripts/run/check-dotenv.sh"
 - **Exit 0**: LLM variables present — proceed.
 - **Exit 1**: missing variables listed in output. Create `.env` file and ask the user to set them in it, then re-run the script. Do not proceed until it exits 0.
 
-**If the user chose Workflow**, analyze the task description from TASK.md to determine whether LLM is still needed:
-
-1. **Task clearly requires LLM** — The task description contains explicit AI/model demands such as: intelligent summarization, AI-based classification, natural language generation, semantic analysis, content understanding that cannot be achieved with deterministic rules, or the user explicitly mentions using AI/LLM/model. In this case, inform the user that their task involves AI-powered operations and LLM configuration is needed, then run the same `.env` validation check above. Do not ask — proceed directly.
-
-2. **Task is ambiguous** — The task description contains operations that *could* involve AI but are not explicitly stated (e.g., "extract key information", "analyze content", "generate a report"). Present the question:
+**If the user chose Workflow**, analyze the task description from TASK.md to determine whether LLM is still needed. If the task description contains operations that *could* involve AI but are not explicitly stated (e.g., "extract key information", "analyze content", "generate a report"). Present the question:
 
    > Your task description mentions operations that may benefit from AI/LLM capabilities (e.g., content analysis, intelligent extraction). Would you like to configure an LLM?
    >

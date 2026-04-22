@@ -29,7 +29,7 @@ You receive from the calling command:
 
 ## Phase 1: Scaffold via bridgic-amphibious CLI (MANDATORY)
 
-**You MUST run this command before writing any code.** Do not create files manually.
+**You MUST run this command under current work directory before writing any code.**
 
 ```bash
 bridgic-amphibious create -n <project-name> --task "<task description>"

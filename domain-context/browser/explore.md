@@ -22,6 +22,9 @@ uv run bridgic-browser tabs           # all open tabs + which is active
 
 Record the **full browser launch parameters** used in this phase (headless, channel, args, viewport, etc., **excluding `user-data-dir`**) into the exploration report. Phase 5 must mirror these values in `main.py` so runtime behavior matches what was observed.
 
+Parameter Setting Guide:
+1. If the task requires login, please launch the browser in non-headless mode to facilitate authentication.
+
 ## Browser environment mode
 
 The auxiliary context will include a **browser mode** value (`Default` or `Isolated`):

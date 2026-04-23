@@ -134,7 +134,7 @@ bash {PLUGIN_ROOT}/scripts/run/monitor.sh {PROJECT_ROOT}/<generator_project>/ [T
 
 The script calls `uv run python main.py`; the script returns only when an actionable event occurs. Re-invoke with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit. The script owns every runtime artifact (`run.log`, `pid`, `human_request.json`, `human_response.json`) and prints the resolved absolute paths to stdout on every exit, so that the agent can interact with them to reason next steps or communicate with the user.
 
-- If the same error recurs 3 times after fixes, stop and report to the user.
+- **If the same error recurs 3 times after fixes, Must stop and report to the user that *You can not complete the task*.**
 - The timeout period should be dynamically set based on the complexity of the task, but **it must not exceed 300 seconds**. To stay within budget: keep loop slices small (Phase 1.3), limit pagination to 1–2 pages, use minimum iteration counts.
 
 ---

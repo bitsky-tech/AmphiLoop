@@ -122,21 +122,20 @@ for item in items:
 A single script handles both launch and monitoring:
 
 ```bash
-bash {PLUGIN_ROOT}/scripts/run/monitor.sh <WORK_DIR> <LOG_FILE> <VERIFY_DIR> [TIMEOUT]
+bash {PLUGIN_ROOT}/scripts/run/monitor.sh {PROJECT_ROOT}/<generator_project>/ [TIMEOUT]
 ```
-
-First call launches `uv run python main.py` in `<WORK_DIR>`; the script returns only when an actionable event occurs. Re-invoke with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit.
-
-**Timeout** must not exceed **300 seconds**. To stay within budget: keep loop slices small (Phase 1.3), limit pagination to 1–2 pages, use minimum iteration counts.
 
 | Exit | Meaning | Agent action |
 |------|---------|--------------|
 | **0** | Finished cleanly | Proceed to Phase 3 |
-| **1** | Finished with errors | Diagnose from stdout (last 50 log lines), fix code, re-run `monitor.sh` |
-| **2** | Human intervention required | Read prompt from stdout, ask user, write `<VERIFY_DIR>/human_response.json` as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
+| **1** | Finished with errors | Diagnose from stdout (last 50 log lines of `run.log`), fix code, re-run `monitor.sh` |
+| **2** | Human intervention required | Read the prompt from stdout, ask the user, write the answer to the `human_response` path printed in stdout as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
 | **3** | Timeout | Report to user and investigate |
 
-If the same error recurs 3 times after fixes, stop and report to the user.
+The script calls `uv run python main.py`; the script returns only when an actionable event occurs. Re-invoke with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit. The script owns every runtime artifact (`run.log`, `pid`, `human_request.json`, `human_response.json`) and prints the resolved absolute paths to stdout on every exit, so that the agent can interact with them to reason next steps or communicate with the user.
+
+- If the same error recurs 3 times after fixes, stop and report to the user.
+- The timeout period should be dynamically set based on the complexity of the task, but **it must not exceed 300 seconds**. To stay within budget: keep loop slices small (Phase 1.3), limit pagination to 1–2 pages, use minimum iteration counts.
 
 ---
 

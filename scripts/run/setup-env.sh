@@ -1,24 +1,23 @@
 #!/bin/bash
-# setup-env.sh — Ensure uv is installed and initialize a uv project.
+# setup-env.sh — Verify the uv toolchain is available.
 #
-# 1. Checks if uv is on PATH. If not, auto-installs it (macOS/Linux/Windows).
-# 2. Runs `uv init --bare` in the working directory if pyproject.toml is absent.
+# PROJECT_ROOT is just a workspace (holds TASK.md and .bridgic/); the actual
+# uv project lives inside the generated subdirectory <project-name>/, which
+# is initialised later by the amphibious-code agent via the bridgic-amphibious
+# skill's install-deps.sh. This script only checks that uv is on PATH (auto-
+# installs it if not) so amphibious-code can run later without surprises.
 #
 # Usage:
-#   setup-env.sh [PROJECT_DIR]   (defaults to current directory)
+#   setup-env.sh
 #
 # Exit codes:
-#   0  uv available and pyproject.toml present
+#   0  uv available
 #   1  uv installation failed
-#   2  uv init failed
 
 set -euo pipefail
 
-PROJECT_DIR="${1:-.}"
-cd "$PROJECT_DIR"
-
 # ──────────────────────────────────────────────
-# 1. Ensure uv is installed
+# Ensure uv is installed
 # ──────────────────────────────────────────────
 if ! command -v uv &>/dev/null; then
     echo "uv not found — installing ..."
@@ -49,18 +48,6 @@ fi
 
 echo "uv: $(uv --version 2>&1)"
 
-# ──────────────────────────────────────────────
-# 2. Initialize uv project (bare — no main.py, README, etc.)
-# ──────────────────────────────────────────────
-if [ ! -f pyproject.toml ]; then
-    echo "No pyproject.toml found — running uv init --bare ..."
-    uv init --bare || { echo "Error: uv init failed."; exit 2; }
-    echo "Created pyproject.toml"
-else
-    echo "pyproject.toml already exists, skipping init"
-fi
-
 echo ""
 echo "=== ENV_READY ==="
 echo "uv: $(uv --version 2>&1)"
-echo "project_dir: $(pwd)"

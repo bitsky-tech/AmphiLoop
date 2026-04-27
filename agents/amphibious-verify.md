@@ -48,7 +48,7 @@ Override the `mode` parameter in `main.py`'s `arun()` as `mode=RunMode.WORKFLOW`
 **Implementation pattern**:
 
 ```python
-# Add import (use the same package as AmphibiousAutoma — check agents.py for the path):
+# Add import (use the same package as AmphibiousAutoma — check amphi.py for the path):
 # --- VERIFY_ONLY_BEGIN ---
 from bridgic.amphibious import RunMode
 # --- VERIFY_ONLY_END ---
@@ -63,7 +63,7 @@ result = await agent.arun(
 ```
 
 **Rules**:
-- Import `RunMode` from the same module as `AmphibiousAutoma` — check existing imports in `agents.py` for the correct path
+- Import `RunMode` from the same module as `AmphibiousAutoma` — check existing imports in `amphi.py` for the correct path
 - If `RunMode` is already imported, skip the import injection
 - If `arun()` already has a `mode=` parameter, replace its value with `RunMode.WORKFLOW`
 - The marker lines inside the function call are valid: when removed in Phase 4, the surrounding arguments remain syntactically correct
@@ -76,7 +76,7 @@ result = await agent.arun(
 grep -rnE "\bHumanCall\b" {generator_project}/
 ```
 
-If grep returns no matches anywhere in the generated project, the workflow has no human-interaction points — **skip 1.2 entirely** (no override, no import). Otherwise insert a `human_input` method override into the agent class (in `agents.py`). This replaces the default stdin-based input with a file-based communication channel that the monitoring loop can interact with.
+If grep returns no matches anywhere in the generated project, the workflow has no human-interaction points — **skip 1.2 entirely** (no override, no import). Otherwise insert a `human_input` method override into the agent class (in `amphi.py`). This replaces the default stdin-based input with a file-based communication channel that the monitoring loop can interact with.
 
 **Where to insert**: As a method of the `AmphibiousAutoma` subclass, after the class definition line.
 
@@ -106,7 +106,7 @@ If grep returns no matches anywhere in the generated project, the workflow has n
 
 ### 1.3 Loop Slicing
 
-**Precondition (inspect first)**: Open `agents.py` and find the `on_workflow` method. Identify each `for ... in <var>:` whose `<var>` is assigned from one of:
+**Precondition (inspect first)**: Open `amphi.py` and find the `on_workflow` method. Identify each `for ... in <var>:` whose `<var>` is assigned from one of:
 
 - `ctx.observation` (directly or via an extract helper, e.g. `extract_items(ctx.observation)`)
 - a tool/SDK call return value that yields a runtime collection
@@ -141,7 +141,7 @@ for item in items:
 A single script handles both launch and monitoring:
 
 ```bash
-bash {PLUGIN_ROOT}/scripts/run/monitor.sh {PROJECT_ROOT}/<generator_project>/ [TIMEOUT]
+bash {PLUGIN_ROOT}/scripts/run/monitor.sh {generator_project} [TIMEOUT]
 ```
 
 | Exit | Meaning | Agent action |

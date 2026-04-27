@@ -59,18 +59,40 @@ If no `config.md` exists, skip this step and treat `domain_config` as empty.
 
 ## Step 4: Environment Setup
 
-Initialize an empty `uv` project in `{PROJECT_ROOT}`:
+Two checks happen here; both must pass before Step 5.
+
+### 4.1 uv toolchain
 
 ```bash
 bash "{PLUGIN_ROOT}/scripts/run/setup-env.sh"
 ```
 
-This checks that `uv` is on PATH and runs `uv init` if `pyproject.toml` is absent.
+Verifies `uv` is on PATH (auto-installs it if missing). PROJECT_ROOT itself is **not** a uv project — the actual uv project is initialised inside the generated `<project-name>/` subdirectory by the `amphibious-code` agent during Phase 4 of `/build`.
 
 - **Exit 0**: capture the `ENV_READY` block from stdout — it goes into `build_context.md` below.
-- **Exit non-zero**: surface the error to the user and **stop the entire pipeline**. Do not proceed to Step 5.
+- **Exit non-zero**: surface the error and **stop the entire pipeline**.
 
-Domain-specific tool installation (custom CLIs, SDKs) is **not** done here — the `amphibious-explore` agent handles it during its own **Analyse Task** phase, using the user-supplied references (which typically include installation instructions).
+### 4.2 Private package index (`BRIDGIC_DEV_INDEX`)
+
+The bridgic-amphibious skill's `deps.ini` pins `bridgic-amphibious` to a private index named `btsk-repo`; its installer (`install-deps.sh`, called later by `amphibious-code`) resolves that name to the URL held in the `BRIDGIC_DEV_INDEX` env var. Without it, dependency installation in Phase 4 fails with `dev_index_missing`.
+
+Check whether it is set:
+
+```bash
+[ -n "${BRIDGIC_DEV_INDEX:-}" ] && echo "set" || echo "missing"
+```
+
+If missing, ask the user to set it before continuing — typically by exporting it in their shell rc file (`~/.zshrc` / `~/.bashrc`) so future `/build` runs inherit it automatically:
+
+```bash
+export BRIDGIC_DEV_INDEX="<URL of the private index>"
+```
+
+Wait for the user to confirm and re-check `${BRIDGIC_DEV_INDEX:-}` in this thread before proceeding to Step 5.
+
+### 4.3 Domain-specific tool installation
+
+Not done here. The `amphibious-explore` agent handles it during its own **Analyse Task** phase, using the user-supplied references (which typically include installation instructions).
 
 ## Step 5: Write Build Context
 

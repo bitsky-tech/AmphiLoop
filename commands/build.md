@@ -121,10 +121,10 @@ Pass to the agent **exactly two inputs**:
 
 **Mode/LLM mapping** (the bridge from Phase 2 choices to `main.py`):
 - **Project mode = Amphiflow** → pass `mode=RunMode.AMPHIFLOW` to `agent.arun()`; otherwise `mode=RunMode.WORKFLOW`.
-- **LLM configured = yes** → initialize `OpenAILlm` from `config.py` / `.env` and pass `llm=llm` to the agent constructor.
+- **LLM configured = yes** → initialize `OpenAILlm` inline in `main.py` from `os.getenv` (after `load_dotenv()`) and pass `llm=llm` to the agent constructor.
 - **LLM configured = no** → pass `llm=None`. Do not import or initialize any LLM classes.
 
-After the agent returns, **append** the resolved generator-project path (the `<project-name>/` directory the scaffold created) to `build_context.md`'s `## Outputs` section by replacing the `(filled by Phase 4)` placeholder.
+After the agent returns, **append** the resolved generator-project path (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) to `build_context.md`'s `## Outputs` section by replacing the `(filled by Phase 4)` placeholder.
 
 ---
 

@@ -16,6 +16,7 @@ AmphiLoop/
 │   ├── bridgic-amphibious/            ← dual-mode agent framework
 │   └── bridgic-llms/                  ← LLM providers and initialization
 ├── agents/                            ← execution methodology: "how to do it well"
+│   ├── amphibious-config.md           ← inline-loaded by /build Phase 2 (interactive; NOT a subagent)
 │   ├── amphibious-explore.md          ← abstract exploration methodology
 │   ├── amphibious-code.md             ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
@@ -31,7 +32,7 @@ AmphiLoop/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     ├── run/                           ← runtime scripts used by agents
-    │   ├── setup-env.sh               ← auto-install uv + uv init --bare
+    │   ├── setup-env.sh               ← verify uv toolchain availability (auto-installs if missing)
     │   ├── check-dotenv.sh            ← .env LLM configuration validation
     │   └── monitor.sh                 ← run-and-monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)

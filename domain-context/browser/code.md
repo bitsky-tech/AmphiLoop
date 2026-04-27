@@ -81,23 +81,51 @@ async def after_action(self, step_result, ctx):
                 break
 ```
 
+### Ref handling — STABLE vs VOLATILE
+
+Browser refs are **deterministic per element**: the same DOM element on the same page yields the same ref string across observations and across runs (until that page navigates or its DOM is mutated). This is what makes `STABLE` annotations in the exploration report meaningful — those refs were captured once during exploration and remain valid at runtime.
+
+**Mirror that distinction directly in `amphi.py`:**
+
+- **STABLE refs → module-level constants.** For every ref tagged STABLE in the exploration report (header buttons, fixed dropdowns, pagination Next, search controls, etc.), declare a constant near the top of `amphi.py` and reference it inline at the yield site. **No `find_<name>_ref(observation)` parser** — the value is already known and re-deriving it by regex is pure waste.
+
+  ```python
+  # Top of amphi.py — copy these from exploration_report.md §2 (STABLE-tagged steps).
+  STATUS_DROPDOWN_REF = "5dc3463e"
+  SEARCH_BUTTON_REF   = "4084c4ad"
+  NEXT_BUTTON_REF     = "cbac3327"
+
+  # In on_workflow:
+  yield ActionCall("click_element_by_ref",
+                   description="Open the status filter dropdown",
+                   ref=STATUS_DROPDOWN_REF)
+  ```
+
+- **VOLATILE refs → extracted per-iteration.** Per-row buttons, dynamically generated list items, and any element whose ref regenerates on each page load go in `ctx.observation` and must be parsed at runtime — see Helpers below.
+
+If the exploration report doesn't list a ref for an element your `on_workflow` needs, that's an exploration gap — go look in `{PROJECT_ROOT}/.bridgic/explore/` artifacts and copy the literal hex ref out of the snapshot. Do not add a regex parser to "auto-discover" it.
+
 ### Helpers — extraction from `ctx.observation`
 
-Helpers parse the accessibility tree text in `ctx.observation` and must be written based on the actual a11y tree structure observed during exploration (see the snapshot files under `{PROJECT_ROOT}/.bridgic/explore/`).
+Helpers exist **only for VOLATILE data** — values that change per page-load, per row, or per run. Parsers for STABLE elements do not belong here (see "Ref handling" above). Base every helper on the actual a11y tree text under `{PROJECT_ROOT}/.bridgic/explore/`.
 
 ```python
 import re
 from typing import Optional
 
 def find_active_tab(observation: str) -> Optional[str]:
-    """Find the active tab's page_id."""
+    """Active tab's page_id. VOLATILE — regenerated per browser session."""
     if not observation:
         return None
     match = re.search(r'(page_\d+)\s*\(active\)', observation)
     return match.group(1) if match else None
+
+def extract_list_rows(observation: str) -> list[dict[str, str]]:
+    """Per-row data from the filtered list. Refs and ids are VOLATILE."""
+    ...
 ```
 
-Keep helpers as module-level functions in `amphi.py` (split into a sibling `helpers.py` only if extraction logic grows large).
+Keep helpers as module-level functions in `amphi.py` (split into a sibling `helpers.py` only if extraction logic grows large). When several VOLATILE values come out of the same observation block, return them together from one helper — don't write a separate finder per field.
 
 ---
 

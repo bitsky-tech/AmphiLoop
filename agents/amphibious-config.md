@@ -101,6 +101,8 @@ Use this exact structure (omit any section whose body would be empty):
 - project_root: {PROJECT_ROOT}
 - env_ready: |
     <verbatim ENV_READY block from setup-env.sh stdout>
+- skills:
+    <skill-name>: <absolute path to its SKILL.md>
 
 ## Outputs
 - exploration_report: (filled by Phase 3)
@@ -112,7 +114,7 @@ Section semantics:
 - **Task** — *what* this build is. `file:` points to the user-authored TASK.md (read on demand for description / expected_output / notes); `domain:` is the resolved selection from Phase 1.
 - **Pipeline** — *how* the generated project should run. `domain_config:` holds the answers from Step 3; if Step 3 captured nothing, omit the `domain_config` line entirely.
 - **References** — absolute paths to user-supplied reference material (resolved in Phase 1 from TASK.md "Domain References"). Read on demand. Omit the section if the user supplied none.
-- **Environment** — toolchain anchors. `env_ready:` is the verbatim block printed by `setup-env.sh`. `skills:` lists framework-skill pointers; agents read them on demand.
+- **Environment** — toolchain anchors. `env_ready:` is the verbatim block printed by `setup-env.sh`. `skills:` enumerates every directory under `{PLUGIN_ROOT}/skills/` that contains a `SKILL.md`, mapping skill name → absolute SKILL.md path; agents read those files on demand.
 - **Outputs** — placeholders that later phases fill in. Phase 3 replaces `(filled by Phase 3)` with the resolved exploration_report path; Phase 4 replaces `(filled by Phase 4)` with the generator_project path.
 
 After writing the file, return control to the calling command — the next phase is Exploration.

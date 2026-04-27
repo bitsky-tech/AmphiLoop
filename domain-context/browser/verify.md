@@ -1,8 +1,8 @@
-# Browser Domain — Phase 6 Verification Context
+# Browser Domain — Phase 5 Verification Context
 
 ## Launch-parameter parity (Default mode)
 
-If **browser mode = Default**, verify that the generated `main.py`'s browser launch parameters (headless, channel, args, viewport, etc.) match those recorded in the exploration report from Phase 4. Mismatches under Default mode break shared-state assumptions (the runtime browser may not see the cookies / login session captured during exploration) and must be fixed before declaring success.
+If **browser mode = Default**, verify that the generated `main.py`'s browser launch parameters (headless, channel, args, viewport, etc.) match those recorded in the exploration report from Phase 3. Mismatches under Default mode break shared-state assumptions (the runtime browser may not see the cookies / login session captured during exploration) and must be fixed before declaring success.
 
 ## Isolated-mode `user-data-dir` override
 

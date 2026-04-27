@@ -37,6 +37,15 @@ Anything else in `$ARGUMENTS` (extra tokens, multiple flags) → stop and ask th
 
 > **Path variables**: `{PLUGIN_ROOT}` and `{PROJECT_ROOT}` are path placeholders — all paths below use these prefixes. If either is missing, the plugin was not loaded correctly — do not proceed.
 
+## Agent invocation contract
+
+Phases 3, 4, and 5 each delegate to a subagent. **Every delegation passes exactly two absolute paths**:
+
+- **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
+- **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
+
+After Phases 3 and 4, **append** the agent's primary output path to `build_context.md`'s `## Outputs` section by replacing the matching `(filled by Phase N)` placeholder.
+
 ---
 
 ## Phase 1: Initialize Task
@@ -82,7 +91,7 @@ The methodology document covers, in this order:
 1. Project Mode (Workflow | Amphiflow)
 2. LLM Configuration (`check-dotenv.sh`)
 3. Domain-specific Configuration (`domain-context/<domain>/config.md`, if any)
-4. Environment Setup (`setup-env.sh` → `uv init`)
+4. Environment Setup (`setup-env.sh` — verifies `uv` toolchain only; the per-project `uv init` happens later inside `<project-name>/`)
 5. Write `{PROJECT_ROOT}/.bridgic/build_context.md` (the single source of truth for Phases 3–5)
 
 If `setup-env.sh` exits non-zero, the methodology doc says to **stop the entire pipeline** — respect that and do not enter Phase 3.
@@ -93,50 +102,23 @@ On successful completion, `{PROJECT_ROOT}/.bridgic/build_context.md` exists and 
 
 ## Phase 3: Exploration
 
-**Delegate to the `amphibious-explore` agent.**
-
-Pass to the agent **exactly two inputs**:
-
-- **build_context_path**: `{PROJECT_ROOT}/.bridgic/build_context.md`
-- **domain_context_path**:
-  - **(if `SELECTED_DOMAIN` is resolved)** the absolute path of `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/explore.md`.
-  - **(else)** `none` (generic flow).
-
-**Do not proceed to Phase 4 until exploration is complete.** The agent's output under `{PROJECT_ROOT}/.bridgic/explore/` (exploration report + artifact files) is the sole bridge between Phase 3 and Phase 4.
-
-After the agent returns, **append** the resolved exploration_report path to `build_context.md`'s `## Outputs` section by replacing the `(filled by Phase 3)` placeholder.
+Delegate to **`amphibious-explore`** (per Agent invocation contract). Do not start Phase 4 until exploration is complete — the report and artifact files under `{PROJECT_ROOT}/.bridgic/explore/` are the sole bridge between Phase 3 and Phase 4. After the agent returns, fill `## Outputs → exploration_report` in `build_context.md`.
 
 ---
 
 ## Phase 4: Generate Amphibious Code
 
-**Delegate to the `amphibious-code` agent.**
+Delegate to **`amphibious-code`** (per Agent invocation contract).
 
-Pass to the agent **exactly two inputs**:
+**Mode / LLM mapping** (Phase 2 choices → `main.py`):
+- Project mode = Amphiflow → `mode=RunMode.AMPHIFLOW`; Workflow → `mode=RunMode.WORKFLOW`.
+- LLM configured = yes → initialise `OpenAILlm` inline in `main.py` from `os.getenv` (after `load_dotenv()`) and pass `llm=llm`.
+- LLM configured = no → pass `llm=None`. Do not import any LLM class.
 
-- **build_context_path**: `{PROJECT_ROOT}/.bridgic/build_context.md`
-- **domain_context_path**:
-  - **(if `SELECTED_DOMAIN` is resolved)** the absolute path of `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/code.md`.
-  - **(else)** `none` (generic flow).
-
-**Mode/LLM mapping** (the bridge from Phase 2 choices to `main.py`):
-- **Project mode = Amphiflow** → pass `mode=RunMode.AMPHIFLOW` to `agent.arun()`; otherwise `mode=RunMode.WORKFLOW`.
-- **LLM configured = yes** → initialize `OpenAILlm` inline in `main.py` from `os.getenv` (after `load_dotenv()`) and pass `llm=llm` to the agent constructor.
-- **LLM configured = no** → pass `llm=None`. Do not import or initialize any LLM classes.
-
-After the agent returns, **append** the resolved generator-project path (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) to `build_context.md`'s `## Outputs` section by replacing the `(filled by Phase 4)` placeholder.
+After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) in `build_context.md`.
 
 ---
 
 ## Phase 5: Verify
 
-**Immediately delegate to the `amphibious-verify` agent.**
-
-Pass to the agent **exactly two inputs**:
-
-- **build_context_path**: `{PROJECT_ROOT}/.bridgic/build_context.md`
-- **domain_context_path**:
-  - **(if `SELECTED_DOMAIN` is resolved)** the absolute path of `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/verify.md`.
-  - **(else)** `none` (generic flow).
-
-Cross-check `on_workflow` against the exploration report's "Operation Sequence" and treat any missing step as a bug to fix.
+Immediately delegate to **`amphibious-verify`** (per Agent invocation contract). Cross-check `on_workflow` against the exploration report's "Operation Sequence" — any missing step is a bug to fix.

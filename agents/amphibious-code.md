@@ -16,16 +16,23 @@ You are a bridgic-amphibious code generation specialist. You receive a task desc
 
 ## Input
 
-You receive from the calling command exactly two paths:
+The calling command passes exactly two absolute paths:
 
-- **build_context_path** — absolute path to `build_context.md`. Read this **once** at the start of the run. It is an *index*: it gives you the task file location (`## Task → file`), the resolved domain, the pipeline configuration (`## Pipeline` — mode, llm_configured, domain_config), the absolute paths of user-supplied reference materials (`## References`), the toolchain anchors (`## Environment` — `plugin_root`, `project_root`, `env_ready`, `skills`), and the exploration_report path under `## Outputs`. For task details, open `## Task → file` (the user-authored TASK.md).
-- **domain_context_path** — absolute path to a domain-specific guidance file (e.g., `domain-context/browser/code.md`), or the literal string `none`. When provided, the directives in that file take precedence over the general rules below for domain-specific concerns.
+- **build_context_path** — `build_context.md` (schema in `amphibious-config.md` Step 5). Read once. For this agent: `## Task → file` (task brief), `## Pipeline` (mode / llm_configured / domain_config — these drive what code to generate), `## References`, `## Environment → skills`, and `## Outputs → exploration_report` (the spine of the code). The references and exploration report carry every fact you need; open them on demand, not upfront.
+- **domain_context_path** — a `domain-context/<domain>/code.md` path, or the literal `none`. **Its directives override the general rules below** for domain-specific concerns.
 
-The reference paths under `## References` and the exploration_report under `.bridgic/explore/` together carry every fact you need to write the code. Open them as the work demands — not all upfront.
+## Bootstrap
+
+Before any other work, batch-load the required startup files. Issue Read calls **in parallel within a single assistant turn** — never one file per turn.
+
+- **Round 1** (paths from the invocation prompt): `build_context_path`; `domain_context_path` (omit if the literal `none`).
+- **Round 2** (paths discovered in `build_context.md`, issued as one second turn): the file under `## Task → file`; the file under `## Outputs → exploration_report`.
+
+Skill files (`## Environment → skills`) and `## References` stay on-demand — do not batch them here.
 
 ## Skill References (read on demand)
 
-Skill files are listed under `## Environment → skills` in `build_context.md`. **Do not read them in full upfront.** Open a skill file only when generating code that uses an API you cannot infer from the per-section rules below or the inline cheatsheet here.
+Open a skill file (paths under `## Environment → skills`) only when generating code that uses an API you cannot infer from the per-section rules below or the inline cheatsheet here.
 
 ```python
 # Core symbols all live in bridgic.amphibious — group them.
@@ -63,7 +70,7 @@ The agent produces this structure under `<PROJECT_ROOT>/<project-name>/` (the *g
 ├── .venv/              # uv-managed virtualenv
 ├── amphi.py            # scaffold-created; this agent edits it
 ├── main.py             # this agent creates: entry point (LLM init + agent.arun)
-├── .env                # only when llm_configured = yes; placeholder values
+├── .env                # only when llm_configured = yes; relocated from PROJECT_ROOT in 1.5
 ├── README.md           # short, operational
 ├── log/                # runtime logs land here (configured in main.py)
 └── result/             # task outputs land here
@@ -96,7 +103,7 @@ cd "<PROJECT_ROOT>/<project-name>"
 uv run bridgic-amphibious create --task "<one-line task description>"
 ```
 
-This creates `amphi.py` containing: a `CognitiveContext` subclass, an `AmphibiousAutoma` subclass with a `think_unit` declaration, and stubs for both `on_agent` and `on_workflow`. **The scaffold deliberately does not create `main.py`, `.env`, or runtime directories — those are caller's responsibility (Phases 4 + 5 below).**
+This creates `amphi.py` containing: a `CognitiveContext` subclass, an `AmphibiousAutoma` subclass with a `think_unit` declaration, and stubs for both `on_agent` and `on_workflow`. **The scaffold deliberately does not create `main.py`, `.env`, or runtime directories — those are caller's responsibility (Phase 1.4–1.5 and Phase 4 below).**
 
 ### 1.4 Create runtime directories
 
@@ -106,6 +113,17 @@ mkdir -p "<PROJECT_ROOT>/<project-name>/log" \
 ```
 
 `log/` receives runtime logs (wired in main.py). `result/` receives task outputs (every output file the project produces lands here, under a relative `result/<filename>` path). Uniform placement is what lets downstream orchestration (monitor.sh, CI capture) find outputs without per-project knowledge.
+
+### 1.5 Relocate `.env` into the project (only if `llm_configured = yes`)
+
+Phase 2 of `/build` (LLM Configuration) created `<PROJECT_ROOT>/.env` and had the user fill it. `main.py` runs from `<project-name>/`, so `load_dotenv()` looks there — move the file in:
+
+```bash
+[ -f "<PROJECT_ROOT>/.env" ] && \
+    mv "<PROJECT_ROOT>/.env" "<PROJECT_ROOT>/<project-name>/.env"
+```
+
+Skip this step entirely when `llm_configured = no` (no `.env` was created). Do **not** write a placeholder `.env` here — the only `.env` is the user-filled one carried over from Phase 2.
 
 ---
 
@@ -152,9 +170,22 @@ An async generator that yields `ActionCall` / `AgentCall` / `HumanCall`. Transla
 
 1. **Every `ActionCall` includes `description="..."`.** The description doubles as debug-log text *and* — critically — as the context the LLM receives when a step fails and triggers agent fallback. Without it, the fallback agent has no idea what the failed step was trying to do.
 
-2. **Stable identifiers hardcoded; volatile identifiers extracted from `ctx.observation`.** The exploration report tags every parameter STABLE/VOLATILE — match it in code. Don't wrap stable refs in lookup helpers; the indirection adds fragility without benefit.
+2. **Operation sequence lives in `on_workflow` itself.** The explore report's "Operation Sequence" maps **one-to-one** to yields inside `on_workflow`. Do not push the yield sequence into helper functions or sibling `async def` methods that just yield through — that turns the workflow into hide-and-seek and makes verify/fallback harder. Sub-generators are only justified when the **same** yielded sub-sequence repeats with parameter variation (e.g. per-row processing called from a `for` loop); a sub-generator called once is bloat — inline it.
 
-3. **Workflow-first principle — prefer `ActionCall` over `AgentCall`.** Use `AgentCall` only for genuinely semantic sub-tasks (analyze, categorize, summarize). Use `HumanCall` only for confirmations the user must resolve.
+3. **Stable identifiers hardcoded; volatile identifiers extracted from `ctx.observation`.** The exploration report records STABLE values (like browser refs) verbatim — `# ref=5dc3463e STABLE`. **Use those literals directly.** Hardcode them as module-level constants near the top of `amphi.py` and reference them inline at the yield site. **Never write a `find_<name>_ref(observation)` parser for a STABLE element** — the value is already known; re-deriving it by regex is pure token waste and breaks the moment the snapshot text format shifts. Helpers (see 2.7) exist only for VOLATILE values.
+
+   ```python
+   # ❌ Wrong — re-discovering a STABLE ref by parsing the snapshot
+   def find_search_button_ref(observation: str) -> Optional[str]:
+       match = re.search(r'button\s+"Search"\s+\[ref=([0-9a-f]+)\]', observation)
+       return match.group(1) if match else None
+
+   # ✅ Right — recorded once during exploration, hardcoded once in code
+   SEARCH_BUTTON_REF = "4084c4ad"   # STABLE per exploration_report.md §2 step 5
+   yield ActionCall("click_element_by_ref", description="Click Search", ref=SEARCH_BUTTON_REF)
+   ```
+
+4. **Workflow-first principle — prefer `ActionCall` over `AgentCall`.** Use `AgentCall` only for genuinely semantic sub-tasks (analyze, categorize, summarize). Use `HumanCall` only for confirmations the user must resolve.
 
    ```python
    yield ActionCall("save_record", description="Persist row to DB", **row)            # Deterministic
@@ -162,9 +193,9 @@ An async generator that yields `ActionCall` / `AgentCall` / `HumanCall`. Transla
    yield HumanCall(prompt="Confirm before deleting?")                                   # Human-only
    ```
 
-4. **Compute dynamic values at runtime.** Relative phrases in the task description ("past 7 days", "today", "last 30 days") must be computed inside the generator with `datetime` etc., not hardcoded at write time.
+5. **Compute dynamic values at runtime.** Relative phrases in the task description ("past 7 days", "today", "last 30 days") must be computed inside the generator with `datetime` etc., not hardcoded at write time.
 
-5. **Keep generator-internal logic minimal.** Code between yields runs in the generator body. **If it raises, the generator is unrecoverable** — `asend()` cannot resume past an exception, so AMPHIFLOW skips per-step retry and jumps directly to full `on_agent` fallback. Keep inline code to variable assignment and pure helpers; push risky operations (network calls, parsing untrusted input) into `ActionCall`-wrapped tools where they can be retried.
+6. **Keep generator-internal logic minimal.** Code between yields runs in the generator body. **If it raises, the generator is unrecoverable** — `asend()` cannot resume past an exception, so AMPHIFLOW skips per-step retry and jumps directly to full `on_agent` fallback. Keep inline code to variable assignment and pure helpers; push risky operations (network calls, parsing untrusted input) into `ActionCall`-wrapped tools where they can be retried.
 
 ### 2.4 `on_agent` — only for `AGENT` or `AMPHIFLOW`
 
@@ -238,7 +269,14 @@ The docstring becomes the description the LLM sees — make it precise and param
 
 Inline in `amphi.py` as module-level functions. Split into `helpers.py` only when extraction logic is large or shared across modules.
 
-**Base every helper on actual sample data** from `<PROJECT_ROOT>/.bridgic/explore/` artifacts — never guess data shape from intuition. Helpers that look reasonable but don't match real data are the most common verification failure.
+**Hard constraints**:
+
+- **Pure.** No I/O, network, SDK calls, `await`, or `yield`. Side-effecting actions are *task tools* (2.6), not helpers.
+- **VOLATILE-only.** Helpers extract values re-observed at runtime; STABLE values are hardcoded constants (see 2.3 #3).
+- **No yielding sub-routines.** The operation sequence stays in `on_workflow` (see 2.3 #2).
+- **One helper per concern.** When several VOLATILE values come out of the same observation block, return them together (`dict` / `tuple` / dataclass) — don't write a separate finder per field.
+
+**Base every helper on actual sample data** from `<PROJECT_ROOT>/.bridgic/explore/` artifacts — never guess data shape. Helpers that look reasonable but don't match real data are the most common verification failure.
 
 ---
 

@@ -89,8 +89,6 @@ bash "{PLUGIN_ROOT}/skills/bridgic-amphibious/scripts/install-deps.sh" \
      "<PROJECT_ROOT>/<project-name>"
 ```
 
-`install-deps.sh` requires `BRIDGIC_DEV_INDEX` to be set (the URL of the private package index that hosts `bridgic-amphibious`); if missing it exits 6. /build's Phase 2 already validates this — if you somehow reach here without it, surface the error and stop.
-
 ### 1.3 Scaffold `amphi.py`
 
 ```bash
@@ -331,34 +329,3 @@ if __name__ == "__main__":
 6. **No `config.py` by default.** Inline `os.getenv` in main.py. Split into a `config.py` only if env loading grows complex (many vars, validation, defaults).
 
 ---
-
-## Phase 5: `.env` (if LLM) and `README.md`
-
-### 5.1 `.env` — only when `llm_configured = yes`
-
-Write placeholders the user fills in before running. Never commit real secrets.
-
-```
-LLM_API_BASE=https://api.openai.com/v1
-LLM_API_KEY=
-LLM_MODEL=gpt-4o
-```
-
-### 5.2 `README.md` — short and operational
-
-Five sections, ~20 lines total:
-
-1. **Purpose** — 1–2 sentences derived from the task description.
-2. **Prerequisites** — Python ≥3.10, `uv`, `BRIDGIC_DEV_INDEX` env var (private package index URL), domain-specific tools (e.g. browser CLI) if any.
-3. **Setup** — `uv sync`. If LLM: fill `.env`.
-4. **Run** — `uv run python main.py` (plus any args from Phase 4 step 1).
-5. **Outputs** — `result/` (task outputs), `log/run.log` (runtime logs).
-
----
-
-## Output
-
-Report back to the calling command:
-
-- **generator_project**: absolute path of `<PROJECT_ROOT>/<project-name>/`.
-- **Status**: PASS (project compiles and helpers validate) or FAIL (with specific blocker).

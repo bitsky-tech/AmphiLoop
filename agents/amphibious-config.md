@@ -59,8 +59,6 @@ If no `config.md` exists, skip this step and treat `domain_config` as empty.
 
 ## Step 4: Environment Setup
 
-Two checks happen here; both must pass before Step 5.
-
 ### 4.1 uv toolchain
 
 ```bash
@@ -72,27 +70,9 @@ Verifies `uv` is on PATH (auto-installs it if missing). PROJECT_ROOT itself is *
 - **Exit 0**: capture the `ENV_READY` block from stdout — it goes into `build_context.md` below.
 - **Exit non-zero**: surface the error and **stop the entire pipeline**.
 
-### 4.2 Private package index (`BRIDGIC_DEV_INDEX`)
+### 4.2 Domain-specific tool installation
 
-The bridgic-amphibious skill's `deps.ini` pins `bridgic-amphibious` to a private index named `btsk-repo`; its installer (`install-deps.sh`, called later by `amphibious-code`) resolves that name to the URL held in the `BRIDGIC_DEV_INDEX` env var. Without it, dependency installation in Phase 4 fails with `dev_index_missing`.
-
-Check whether it is set:
-
-```bash
-[ -n "${BRIDGIC_DEV_INDEX:-}" ] && echo "set" || echo "missing"
-```
-
-If missing, ask the user to set it before continuing — typically by exporting it in their shell rc file (`~/.zshrc` / `~/.bashrc`) so future `/build` runs inherit it automatically:
-
-```bash
-export BRIDGIC_DEV_INDEX="<URL of the private index>"
-```
-
-Wait for the user to confirm and re-check `${BRIDGIC_DEV_INDEX:-}` in this thread before proceeding to Step 5.
-
-### 4.3 Domain-specific tool installation
-
-Not done here. The `amphibious-explore` agent handles it during its own **Analyse Task** phase, using the user-supplied references (which typically include installation instructions).
+**By Reference**. The `amphibious-explore` agent handles it during its own **Analyse Task** phase, using the user-supplied references (which typically include installation instructions).
 
 ## Step 5: Write Build Context
 

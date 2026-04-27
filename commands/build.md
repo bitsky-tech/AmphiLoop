@@ -43,7 +43,7 @@ Anything else in `$ARGUMENTS` (extra tokens, multiple flags) → stop and ask th
 
 Generate a `TASK.md` template file in `{PROJECT_ROOT}` for the user to describe their task. Read the template from `{PLUGIN_ROOT}/templates/build-task-template.md` and write its contents verbatim to `{PROJECT_ROOT}/TASK.md`. The template includes sections for *Task Description*, *Expected Output*, *Domain References*, and *Notes*. After writing the file, tell the user: A task template has been created at `TASK.md`. Please fill it in.
 
-Wait for the user to confirm. Then read `{PROJECT_ROOT}/TASK.md` and extract:
+Wait for the user to confirm. Then read `{PROJECT_ROOT}/TASK.md` and understand:
 
 - **Task Description** — goal of the project.
 - **Expected Output** — what indicates success.

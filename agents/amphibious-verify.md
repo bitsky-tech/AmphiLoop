@@ -6,8 +6,6 @@ description: >-
   loop slicing), runs the program with log monitoring, handles human-in-the-loop
   interactions, validates results, and cleans up all debug code on success.
   Scene-agnostic — domain-specific verification rules arrive via domain context.
-tools: ["Bash", "Read", "Grep", "Glob", "Edit", "Write"]
-model: opus
 ---
 
 # Amphibious Verify Agent

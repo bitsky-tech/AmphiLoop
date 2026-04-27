@@ -8,8 +8,6 @@ description: >-
   re-observed each time the plan is carried out). Produces a pseudocode
   operation sequence with inline stability annotations plus any key-artifact
   files capturing the observed states the plan references.
-tools: ["Bash", "Read", "Grep", "Write"]
-model: opus
 ---
 
 # Amphibious Explore Agent

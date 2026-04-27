@@ -22,11 +22,12 @@ These three concerns come together in **one artifact**: the pseudocode operation
 
 ## Input
 
-You receive from the calling command:
+You receive from the calling command exactly two paths:
 
-- **Task description** — goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect.
-- **Domain context** — (optional): Domain-specific instructions provided by the command — tool setup patterns, observation/cleanup protocols, When provided, domain context takes precedence over the general rules below for domain-specific concerns.
-- **Auxiliary context** (optional): Auxiliary information about the target system that can guide code generation (e.g., operation sequences, identifier stability, edge cases)
+- **build_context_path** — absolute path to `build_context.md`. Read this **once** at the start of the run. It is an *index*, not a full task brief: it tells you the task file location (`## Task → file`), the resolved domain, the pipeline configuration (`## Pipeline`), the absolute paths of user-supplied reference materials (`## References`), and the toolchain anchors (`## Environment` — `plugin_root`, `project_root`, `env_ready`, `skills`). For task details, open `## Task → file` (the user-authored TASK.md) — the index does not duplicate it.
+- **domain_context_path** — absolute path to a domain-specific guidance file (e.g., `domain-context/browser/explore.md`), or the literal string `none`. When provided, the directives in that file take precedence over the general rules below for domain-specific concerns.
+
+The paths listed under `## References` may point to SKILL.md files, CLI help dumps, SDK docs, style guides, or any other material that teaches *how to act* or *what rules to follow*. Open each when its content becomes relevant to **Analyse Task** below — not all upfront.
 
 ## Analyse Task
 
@@ -74,7 +75,7 @@ For every step, follow the loop:
 3. **Act** — execute the chosen action.
 4. **Record** — capture the operation, its parameters, and each parameter's stability classification (see below).
 
-Do not advance the plan without observing first. Do not record an operation without classifying its parameters.
+Do not advance the plan without observing first. Classify a parameter **only when its value varies across iterations or runs** — constants, verbatim literals, and values fully determined by the task description need no STABLE tag (their stability is implicit). Reserve annotations for genuine choice points where a future executor must decide between "reuse the recorded value" and "re-observe at runtime".
 
 ### What to Record
 
@@ -89,6 +90,8 @@ Firstly, Capture every structural element needed to reproduce the task end-to-en
 - **Branches** — divergence on observed state (`IF` / `ELSE`), together with what each side does.
 
 To record loops and branches faithfully, you must **probe their boundaries and alternate paths during exploration** — not only the happy path. Walk at least one full iteration of every loop and check its termination condition (last item, empty collection, exit signal); observe both sides of every branch (success and error, present and absent). Without this, the control flow in your pseudocode will be guesswork.
+
+**Scope the probing**: only probe branches whose outcome changes the **recorded output or the next operation chosen**. Cosmetic variations that the plan would handle identically (e.g. styling differences, optional UI hints, alternative phrasings of the same success message) need not be probed — note them as "(cosmetic, ignored)" if at all. The goal is faithful control flow, not exhaustive enumeration.
 
 Secondly, mark **human handoffs** — points where the task requires intervention that automation cannot resolve alone (authentication wall, CAPTCHA, destructive-confirm dialog, permissions you lack, ambiguous UI, unexpected error state). Record each as a `HUMAN:` step in the plan, describing what the human must do and the signal to resume.
 
@@ -116,7 +119,9 @@ Use the domain context's stability vocabulary if supplied; otherwise default to 
 
 #### 3. Save Key Artifacts
 
-Save the raw observation output of any state that contains **volatile parameters or fields**. These artifacts preserve the exact structure where those volatile values appear, grounding every `VOLATILE` reference in the plan in a concrete, inspectable sample.
+**Skip this section entirely if the Operation Sequence contains no `VOLATILE`-tagged parameter.** Artifacts exist solely to ground volatile references in inspectable samples — without volatile data, there is nothing to ground.
+
+Otherwise, save the raw observation output of any state that contains **volatile parameters or fields**. These artifacts preserve the exact structure where those volatile values appear, grounding every `VOLATILE` reference in the plan in a concrete, inspectable sample.
 
 Save only states that contain extractable volatile data, not every intermediate observation. Use descriptive filenames (e.g., `list_state.txt`, `detail_state.txt`).
 

@@ -15,17 +15,43 @@ You are a bridgic-amphibious code generation specialist. You receive a task desc
 
 ## Input
 
-You receive from the calling command:
-- **Task description**: goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect; such cited references.
-- **Domain context** (optional): Domain-specific instructions provided by the command — tool setup patterns, observation patterns, state tracking patterns, per-file overrides, and reference files to read. When provided, domain context takes precedence over the general rules below for domain-specific concerns.
-- **Auxiliary context** (optional): Auxiliary information about the target system that can guide code generation (e.g., operation sequences, identifier stability, edge cases)
+You receive from the calling command exactly two paths:
 
-## Dependent Skills
+- **build_context_path** — absolute path to `build_context.md`. Read this **once** at the start of the run. It is an *index*, not a full task brief: it gives you the task file location (`## Task → file`), the resolved domain, the pipeline configuration (`## Pipeline` — mode, llm_configured, domain_config), the absolute paths of user-supplied reference materials (`## References`), the toolchain anchors (`## Environment` — `plugin_root`, `project_root`, `env_ready`, `skills`), and the exploration_report path under `## Outputs`. For task details, open `## Task → file` (the user-authored TASK.md).
+- **domain_context_path** — absolute path to a domain-specific guidance file (e.g., `domain-context/browser/code.md`), or the literal string `none`. When provided, the directives in that file take precedence over the general rules below for domain-specific concerns.
 
-Before starting, you **MUST** read and load all dependent skills listed below.
+The reference paths under `## References` and the exploration_report under `.bridgic/explore/` together carry every fact you need to write the code. Open them as the work demands — not all upfront.
 
-- **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md`
-- **bridgic-llms** — `skills/bridgic-llms/SKILL.md`
+## Skill References (read on demand)
+
+Skill files are listed under `## Environment → skills` in `build_context.md`. **Do not read them in full upfront.** Open a skill file only when generating code that uses an API you cannot infer from the per-file rules below or the inline cheatsheet here.
+
+The framework's most common entry points fit on a few lines — start with this cheatsheet, fall back to the skill files only for unfamiliar APIs:
+
+```python
+# Core symbols all come from bridgic.amphibious — group the imports.
+from bridgic.amphibious import (
+    AmphibiousAutoma,           # base class for the agent
+    CognitiveContext,           # state container (subclass in workers.py)
+    CognitiveWorker, think_unit,  # for on_agent think units
+    RunMode,                    # WORKFLOW | AGENT | AMPHIFLOW | AUTO
+    ActionCall, AgentCall, HumanCall,  # yields used inside on_workflow
+)
+
+# Tool registration (task tools live in tools.py).
+from bridgic.core.agentic.tool_specs import FunctionToolSpec
+# FunctionToolSpec.from_raw(async_fn)
+
+# Workflow yield shapes:
+#   yield ActionCall("tool_name", description="...", arg=...)
+#   yield AgentCall(goal="...", tools=[...], max_attempts=3)
+#   yield HumanCall(prompt="...")
+
+# LLM (only when llm_configured = yes in build_context.md)
+from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
+```
+
+If a feature you need is not covered above (advanced hooks, non-OpenAI LLMs, custom tool specs), open the relevant skill file at the path listed in `build_context.md`.
 
 ## Phase 1: Scaffold via bridgic-amphibious CLI (MANDATORY)
 
@@ -35,7 +61,7 @@ Before starting, you **MUST** read and load all dependent skills listed below.
 bridgic-amphibious create -n <project-name> --task "<task description>"
 ```
 
-This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `helpers.py`, `skills/`, `result/`, `log/` under a new directory named `<project-name>/`. The generated files contain boilerplate code and comments that guide the implementation in the next phases. **After the scaffold is created**, adapt each generated file based on the task description, domain context, and auxiliary context.
+This generates the project skeleton: `task.md`, `config.py`, `tools.py`, `workers.py`, `agents.py`, `helpers.py`, `skills/`, `result/`, `log/` under a new directory named `<project-name>/`. The generated files contain boilerplate code and comments that guide the implementation in the next phases. **After the scaffold is created**, adapt each generated file based on `build_context.md` (task summary, mode, LLM flag, domain references) and the domain-context file (if any).
 
 ## Phase 2: Generate bridgic-amphibious project (Per-File Rules)
 
@@ -135,7 +161,7 @@ The output directory for **task results produced by the generated project at run
 
 ## Phase 3: Validate Generated Helpers
 
-After all code is generated, validate each helper function in `helpers.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced in the auxiliary context). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
+After all code is generated, validate each helper function in `helpers.py` against real sample data (e.g., saved files under `{PROJECT_ROOT}/.bridgic/explore/`, or any representative data referenced from the exploration report). Use Python to call each function and verify the output is non-empty and structurally correct. Fix and re-test if needed.
 
 ```bash
 # Such as:

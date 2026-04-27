@@ -123,8 +123,8 @@ while true; do
         else
             echo "=== MONITOR: PROGRAM_FINISHED ==="
             print_paths
-            echo "--- Last 30 lines of log ---"
-            tail -30 "$LOG_FILE" 2>/dev/null || echo "(log file not found)"
+            echo "--- Last 10 lines of log ---"
+            tail -10 "$LOG_FILE" 2>/dev/null || echo "(log file not found)"
             exit 0
         fi
     fi

@@ -14,17 +14,16 @@ You are a verification specialist for bridgic-amphibious projects. Your job is t
 
 ## Input
 
-You receive from the calling command:
-- **Task description**: goal, expected output, constraints. May cite external references (skills, style guides, CLI docs, SDK docs) that the executor must respect; such cited references.
-- **Domain context** (optional): Domain-specific verification rules — helper check methods, expected output indicators, domain-specific error patterns. When provided, domain context takes precedence over the general rules below for domain-specific concerns.
-- **Auxiliary context** (optional): Supporting information for verification (e.g., pre-analysis reports, sample data, expected output indicators)
+You receive from the calling command exactly two paths:
 
-## Dependent Skills
+- **build_context_path** — absolute path to `build_context.md`. Read this **once** at the start of the run. It is an *index*, not a full task brief: it gives you the task file location (`## Task → file`), the resolved domain, the pipeline configuration (`## Pipeline`), reference paths (`## References`), toolchain anchors (`## Environment` — `plugin_root`, `project_root`, `env_ready`, `skills`), and the `exploration_report` and `generator_project` paths under `## Outputs`. For task details (expected output, notes), open `## Task → file` (the user-authored TASK.md).
+- **domain_context_path** — absolute path to a domain-specific verification file (e.g., `domain-context/browser/verify.md`), or the literal string `none`. When provided, the directives in that file take precedence over the general rules below for domain-specific concerns.
 
-Before starting, you **MUST** read and load all dependent skills listed below.
+The exploration report under `.bridgic/explore/` and the generated project at the `generator_project` path are your primary working surfaces; open files there as the work demands — not all upfront.
 
-- **bridgic-amphibious** — `skills/bridgic-amphibious/SKILL.md`
-- **bridgic-llms** — `skills/bridgic-llms/SKILL.md`
+## Skill References (read on demand)
+
+Skill files are listed under `## Environment → skills` in `build_context.md`. **Do not read them in full upfront.** Open a skill file only when you hit a specific verification decision that requires API-level detail you cannot infer from the generated code or the exploration report (e.g., the exact import path for `RunMode`, the constructor signature of an LLM class). Most verification work — grepping for `HumanCall`, checking `arun()` arguments, inspecting `on_workflow` — needs no skill content at all.
 
 ---
 
@@ -33,6 +32,14 @@ Before starting, you **MUST** read and load all dependent skills listed below.
 Insert temporary verification instrumentation into the generated code. **Every insertion** must be wrapped in `# --- VERIFY_ONLY_BEGIN ---` / `# --- VERIFY_ONLY_END ---` markers.
 
 ### 1.1 Force Workflow Mode
+
+**Precondition (grep first)**: Run
+
+```bash
+grep -nE "mode\s*=\s*RunMode\.WORKFLOW" {generator_project}/main.py
+```
+
+If grep returns a match, `main.py` is already pinned to `RunMode.WORKFLOW` — **skip 1.1 entirely** (no import, no edit). Otherwise proceed with the override below.
 
 Override the `mode` parameter in `main.py`'s `arun()` as `mode=RunMode.WORKFLOW` call to force pure workflow execution. This prevents the amphibious/auto fallback from masking workflow errors — any failure in `on_workflow` will surface immediately instead of silently degrading to agent mode.
 
@@ -63,7 +70,13 @@ result = await agent.arun(
 
 ### 1.2 Human Input Signal-File Override
 
-If there are any points in the workflow that require human interaction, insert a `human_input` method override into the agent class (in `agents.py`). This replaces the default stdin-based input with a file-based communication channel that the monitoring loop can interact with.
+**Precondition (grep first)**: Run
+
+```bash
+grep -rnE "\bHumanCall\b" {generator_project}/
+```
+
+If grep returns no matches anywhere in the generated project, the workflow has no human-interaction points — **skip 1.2 entirely** (no override, no import). Otherwise insert a `human_input` method override into the agent class (in `agents.py`). This replaces the default stdin-based input with a file-based communication channel that the monitoring loop can interact with.
 
 **Where to insert**: As a method of the `AmphibiousAutoma` subclass, after the class definition line.
 
@@ -93,7 +106,15 @@ If there are any points in the workflow that require human interaction, insert a
 
 ### 1.3 Loop Slicing
 
-For each dynamic list loop in `on_workflow`, **insert a slice immediately before the `for` statement to limit iterations during verification.**
+**Precondition (inspect first)**: Open `agents.py` and find the `on_workflow` method. Identify each `for ... in <var>:` whose `<var>` is assigned from one of:
+
+- `ctx.observation` (directly or via an extract helper, e.g. `extract_items(ctx.observation)`)
+- a tool/SDK call return value that yields a runtime collection
+- an `await` on an API response
+
+If `on_workflow` contains **no** such dynamic loop, **skip 1.3 entirely**. Loops that iterate over fixed/literal collections (e.g. `for url in ["...", "..."]`) are deterministic and must not be sliced.
+
+For each qualifying dynamic loop, **insert a slice immediately before the `for` statement to limit iterations during verification.**
 
 **Pattern**:
 
@@ -107,8 +128,8 @@ for item in items:
 ```
 
 **Rules**:
-- Only slice **dynamic** loops (lists extracted at runtime from observation, API responses, etc.)
-- Do NOT slice deterministic step sequences (stable ref clicks, navigation chains)
+- Only slice the dynamic loops identified above
+- Do NOT slice deterministic step sequences (stable ref clicks, navigation chains, fixed-list iteration)
 - The slice size `[:3]` is the default — adjust if the domain context specifies otherwise
 
 ---
@@ -142,9 +163,9 @@ The script calls `uv run python main.py`; the script returns only when an action
 1. **Exit code**: Confirm the process exited with code 0
 2. **Error-free logs**: Grep the full log for `ERROR`, `Traceback`, `Exception` — there should be none
 3. **Expected output**: Check that the task's expected output was produced, based on:
-   - Task description's "expected output" field
-   - Domain context's "expected output indicators" (if provided)
-   - Log content showing successful completion messages
+   - the `expected_output` field in `build_context.md`
+   - the domain-context file's "expected output indicators" (if `domain_context_path` was provided)
+   - log content showing successful completion messages
 4. **If validation fails**: Diagnose → fix → return to Phase 2.1
 
 ---

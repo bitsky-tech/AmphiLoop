@@ -8,6 +8,7 @@ description: >-
   re-observed each time the plan is carried out). Produces a pseudocode
   operation sequence with inline stability annotations plus any key-artifact
   files capturing the observed states the plan references.
+tools: ["Bash", "Read", "Grep", "Write", "Edit"]
 ---
 
 # Amphibious Explore Agent
@@ -28,7 +29,7 @@ Before any other work, batch-load the required startup files. Issue Read calls *
 - **Round 1** (paths from the invocation prompt): `build_context_path`; `domain_context_path` (omit if the literal `none`).
 - **Round 2** (paths discovered in `build_context.md`, issued as one second turn): the file under `## Task → file`.
 
-References (`## References`) and skill files stay on-demand — do not batch them here.
+References (`## References`) stay on-demand — do not batch them here.
 
 ## Analyse Task
 

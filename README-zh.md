@@ -111,6 +111,8 @@ AmphiLoop/
 │   └── amphibious-verify.md     #   项目验证专家
 ├── commands/                    # 用户可调用的工作流
 │   └── build.md                 #   统一流水线（可选 --<domain> 标志）
+├── domain-context/              # /build 注入的预蒸馏领域上下文
+│   └── browser/                 #   intent.md / config.md / explore.md / code.md / verify.md（含 script/）
 ├── templates/                   # 命令使用的静态模板（不会被自动扫描）
 │   └── build-task-template.md         #   /build 使用的统一 TASK.md 模板
 ├── hooks/                       # 自动加载的事件处理器
@@ -119,9 +121,9 @@ AmphiLoop/
     ├── hook/
     │   └── inject-command-paths.sh
     ├── run/
-    │   ├── setup-env.sh         #   环境配置（uv、依赖、playwright）
+    │   ├── setup-env.sh         #   校验 uv 工具链；在 PROJECT_ROOT 执行 uv init --bare
     │   ├── check-dotenv.sh      #   LLM 模型配置校验
-    │   └── monitor.sh
+    │   └── monitor.sh           #   amphibious-verify 的 run-and-monitor 脚本
     └── maintenance/
         └── sync-skills.sh       #   从源仓库同步 skills（基于 manifest.ini）
 ```

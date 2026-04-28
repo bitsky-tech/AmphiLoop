@@ -111,6 +111,8 @@ AmphiLoop/
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
 │   └── build.md                 #   Unified pipeline (accepts optional --<domain> flag)
+├── domain-context/              # Pre-distilled per-domain context injected by /build
+│   └── browser/                 #   intent.md, config.md, explore.md, code.md, verify.md (+ script/)
 ├── templates/                   # Static templates read by commands (not auto-scanned)
 │   └── build-task-template.md         #   Unified TASK.md template used by /build
 ├── hooks/                       # Auto-loaded event handlers
@@ -119,9 +121,9 @@ AmphiLoop/
     ├── hook/
     │   └── inject-command-paths.sh
     ├── run/
-    │   ├── setup-env.sh         #   Environment setup (uv, deps, playwright)
+    │   ├── setup-env.sh         #   Verify uv toolchain; uv init --bare in PROJECT_ROOT
     │   ├── check-dotenv.sh      #   LLM configuration validation
-    │   └── monitor.sh
+    │   └── monitor.sh           #   Run-and-monitor for amphibious-verify
     └── maintenance/
         └── sync-skills.sh       #   Sync skills from source repos via manifest.ini
 ```

@@ -8,7 +8,8 @@ Agent skill & knowledge corpus for the Bridgic ecosystem — providing skills, a
 AmphiLoop/
 ├── CLAUDE.md                          ← this file
 ├── .claude-plugin/
-│   └── plugin.json                    ← Claude Code plugin registration
+│   ├── plugin.json                    ← Claude Code plugin registration
+│   └── marketplace.json               ← marketplace metadata
 ├── skills/                            ← domain knowledge: "what it is, how to use it"
 │   ├── manifest.ini                  ← skill source registry (repo, ref, paths)
 │   ├── README.md                      ← manifest docs + auto-generated skill table
@@ -24,6 +25,7 @@ AmphiLoop/
 │   └── build.md                       ← /build pipeline (domain-agnostic; accepts --<domain>)
 ├── domain-context/                    ← pre-distilled per-domain context injected by /build
 │   └── browser/                       ← intent.md, config.md, explore.md, code.md, verify.md
+│       └── script/                    ← domain-only helpers (e.g. browser-observe.sh)
 ├── templates/                         ← static templates read by commands (not auto-scanned by Claude Code)
 │   └── build-task-template.md         ← unified TASK.md template (used by /build Phase 1)
 ├── hooks/                             ← auto-loaded by Claude Code
@@ -32,7 +34,7 @@ AmphiLoop/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     ├── run/                           ← runtime scripts used by agents
-    │   ├── setup-env.sh               ← verify uv toolchain availability (auto-installs if missing)
+    │   ├── setup-env.sh               ← verify uv toolchain (auto-installs if missing) and run `uv init --bare` in PROJECT_ROOT
     │   ├── check-dotenv.sh            ← .env LLM configuration validation
     │   └── monitor.sh                 ← run-and-monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)

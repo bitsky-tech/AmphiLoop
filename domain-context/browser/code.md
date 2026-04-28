@@ -2,7 +2,7 @@
 
 ## Domain reference files to read
 
-- `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` — SDK tool names and usage.
+**MUST** read `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` — SDK tool names and usage.
 
 ## Faithful to exploration report
 
@@ -12,22 +12,20 @@
 
 **Do not use `evaluate_javascript_on_ref` (or any JS execution) to set form values, trigger clicks, or manipulate DOM elements.** JS-based DOM changes bypass the frontend framework's event bindings — the page appears to change but internal state remains stale. `evaluate_javascript_on_ref` is only acceptable for **reading** data from the page, never for writing.
 
-**Use the appropriate browser tools (`input_text_by_ref`, `click_element_by_ref`, etc.) for all interactions that modify page state.** These tools trigger the correct events and ensure the page's internal state stays consistent with the visible UI.
-
 ## Action conventions
 
 - `ActionCall` tool names must match SDK method names (not CLI command names). See `cli-sdk-api-mapping.md`.
-- **Explicit `wait_for` after every browser action.** Every browser operation (`navigate_to`, `click_element_by_ref`, `input_text_by_ref`, etc.) must be immediately followed by a `yield ActionCall("wait_for", ...)` call. Recommended durations by action type:
+- **Explicit `wait_for` after every browser action.** Every state-mutating call is followed by `yield ActionCall("wait_for", time_seconds=<n>, description="...")`. Condition-based waits use `text=` / `text_gone=` / `selector=` (see `cli-sdk-api-mapping.md`). Recommended durations:
 
-  | Action type | Wait (seconds) |
+  | Action type | `time_seconds` |
   |---|---|
   | Navigation / full page load | 3–5 |
-  | Click that triggers content loading (search, filter, tab switch) | 3–5 |
-  | Click that opens dropdown / toggles UI element | 1–2 |
+  | Click that triggers content loading | 3–5 |
+  | Click that opens dropdown / toggles UI | 1–2 |
   | Text input / form fill | 1–2 |
   | Close tab / minor UI action | 1–2 |
 
-  Adjust based on actual observed response times during exploration.
+  Adjust to actual observed response times.
 
 ## Observation management
 
@@ -132,15 +130,13 @@ Keep helpers as module-level functions in `amphi.py` (split into a sibling `help
 ## `main.py` — browser lifecycle, run mode, LLM init, tool assembly
 
 - **Browser lifecycle**: `async with Browser(...) as browser` — create in `main.py`, store in context.
-  - **Isolated mode**: set `user_data_dir` to `<PROJECT_ROOT>/<project-name>/.bridgic/browser/` so each generated project runs in its own clean profile.
+  - **Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` (resolved at runtime as `Path(__file__).parent.parent / ".bridgic" / "browser"`). Matches the path used by Phase 3 exploration and Phase 5 verification, so the same isolated profile chain carries through every phase.
   - **Default mode**: omit `user_data_dir` (use the browser's default profile).
   - All other launch parameters (headless, channel, args, viewport, etc.) must mirror those recorded in the exploration report — otherwise, under Default mode the shared browser state observed during exploration may not be reachable at runtime.
 - **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
-- **Run mode**: `mode=RunMode.AMPHIFLOW` if project mode is *Amphiflow*, otherwise `mode=RunMode.WORKFLOW`. Pass explicitly — don't rely on `AUTO`.
-- **LLM initialization** (driven by the `llm_configured` flag in `build_context.md → ## Pipeline`):
-  - **`llm_configured = yes`**: `OpenAILlm` from `os.getenv` after `load_dotenv()`; pass `llm=llm`.
-  - **`llm_configured = no`**: pass `llm=None`. Do not import any LLM classes.
 - **Goal**: hardcode the task description as a string in `main.py`. Multi-line descriptions go into a triple-quoted constant. Do not read it from a sibling file — the project should be runnable as-is from its own directory.
+
+Run-mode (`RunMode.WORKFLOW` / `RunMode.AMPHIFLOW`) and LLM initialization (`llm=llm` vs `llm=None`) follow the generic rules in `amphibious-code.md` — no browser-specific override.
 
 ```python
 import asyncio
@@ -156,7 +152,7 @@ from bridgic.browser.tools import BrowserToolSetBuilder
 # Only when llm_configured = yes:
 # from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
 
-from amphi import Amphi, TASK_TOOLS
+from amphi import Amphi, AmphiContext, TASK_TOOLS
 
 LOG_DIR = Path(__file__).parent / "log"
 
@@ -166,7 +162,8 @@ GOAL = """
 
 
 async def main():
-    load_dotenv()
+    # .env lives at PROJECT_ROOT (one level above this file's directory).
+    load_dotenv(Path(__file__).parent.parent / ".env")
 
     LOG_DIR.mkdir(exist_ok=True)
     logging.basicConfig(
@@ -193,7 +190,9 @@ async def main():
     # )
 
     # Launch parameters below mirror the exploration report's recorded values.
-    # Under Isolated mode also pass user_data_dir=<project>/.bridgic/browser/.
+    # Under Isolated mode also pass
+    # user_data_dir=Path(__file__).parent.parent / ".bridgic" / "browser"
+    # (i.e. {PROJECT_ROOT}/.bridgic/browser/).
     async with Browser(headless=False) as browser:
         builder = BrowserToolSetBuilder.for_tool_names(
             browser,
@@ -205,9 +204,10 @@ async def main():
         all_tools = [*browser_tools, *TASK_TOOLS]
 
         agent = Amphi(llm=llm, verbose=True)
+        # context carries `browser` (non-serializable) and `goal`; `tools` MUST
+        # go to arun() — context.tools is `CognitiveTools`, not a list.
         await agent.arun(
-            goal=GOAL,
-            browser=browser,
+            context=AmphiContext(browser=browser, goal=GOAL),
             tools=all_tools,
             mode=RunMode.WORKFLOW,  # or RunMode.AMPHIFLOW
         )

@@ -44,7 +44,10 @@ Phases 3, 4, and 5 each delegate to a subagent. **Every delegation passes exactl
 - **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
 - **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
 
-After Phases 3 and 4, **append** the agent's primary output path to `build_context.md`'s `## Outputs` section by replacing the matching `(filled by Phase N)` placeholder.
+After Phases 3 and 4, refresh `build_context.md` in two places:
+
+1. **Outputs** — replace the matching `(filled by Phase N)` placeholder with the agent's primary output path.
+2. **env_ready** — read `{PROJECT_ROOT}/pyproject.toml` and update the dump under `--- pyproject.toml ---` inside the `env_ready:` block with its current contents.
 
 ---
 
@@ -91,7 +94,7 @@ The methodology document covers, in this order:
 1. Project Mode (Workflow | Amphiflow)
 2. LLM Configuration (`check-dotenv.sh`)
 3. Domain-specific Configuration (`domain-context/<domain>/config.md`, if any)
-4. Environment Setup (`setup-env.sh` — verifies `uv` toolchain only; the per-project `uv init` happens later inside `<project-name>/`)
+4. Environment Setup (`setup-env.sh` — verifies the `uv` toolchain and runs `uv init --bare` in `PROJECT_ROOT` so later phases share one uv env)
 5. Write `{PROJECT_ROOT}/.bridgic/build_context.md` (the single source of truth for Phases 3–5)
 
 If `setup-env.sh` exits non-zero, the methodology doc says to **stop the entire pipeline** — respect that and do not enter Phase 3.
@@ -108,12 +111,7 @@ Delegate to **`amphibious-explore`** (per Agent invocation contract). Do not sta
 
 ## Phase 4: Generate Amphibious Code
 
-Delegate to **`amphibious-code`** (per Agent invocation contract).
-
-**Mode / LLM mapping** (Phase 2 choices → `main.py`):
-- Project mode = Amphiflow → `mode=RunMode.AMPHIFLOW`; Workflow → `mode=RunMode.WORKFLOW`.
-- LLM configured = yes → initialise `OpenAILlm` inline in `main.py` from `os.getenv` (after `load_dotenv()`) and pass `llm=llm`.
-- LLM configured = no → pass `llm=None`. Do not import any LLM class.
+Delegate to **`amphibious-code`** (per Agent invocation contract). The agent reads `## Pipeline → mode` and `llm_configured` from `build_context.md` and applies its own mode-/LLM-mapping rules.
 
 After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) in `build_context.md`.
 
@@ -121,4 +119,4 @@ After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_
 
 ## Phase 5: Verify
 
-Immediately delegate to **`amphibious-verify`** (per Agent invocation contract). Cross-check `on_workflow` against the exploration report's "Operation Sequence" — any missing step is a bug to fix.
+Delegate to **`amphibious-verify`** (per Agent invocation contract).

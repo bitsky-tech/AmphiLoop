@@ -12,7 +12,10 @@
 # Usage:
 #   monitor.sh <WORK_DIR> [TIMEOUT_SECONDS]
 #
-# The script owns all runtime artifacts under <WORK_DIR>/.bridgic/verify/:
+# The script owns all runtime artifacts under <PROJECT_ROOT>/.bridgic/verify/
+# (PROJECT_ROOT = parent of WORK_DIR — the generator project lives at
+# <PROJECT_ROOT>/<project-name>/), so verify state sits next to build_context.md
+# and explore/ instead of polluting the generator project:
 #   run.log              — captured stdout/stderr of the launched program
 #   pid                  — PID of the running program (removed on exit)
 #   human_request.json   — written by the program when it needs human input
@@ -37,7 +40,10 @@ if [ "$TIMEOUT" -gt "$MAX_TIMEOUT" ]; then
 fi
 
 # Derived paths — caller should never need to know these.
-VERIFY_DIR="${WORK_DIR}/.bridgic/verify"
+# Verify artifacts live under PROJECT_ROOT (= parent of WORK_DIR), not under
+# the generator project itself.
+PROJECT_ROOT="$(dirname "${WORK_DIR%/}")"
+VERIFY_DIR="${PROJECT_ROOT}/.bridgic/verify"
 LOG_FILE="${VERIFY_DIR}/run.log"
 PID_FILE="${VERIFY_DIR}/pid"
 

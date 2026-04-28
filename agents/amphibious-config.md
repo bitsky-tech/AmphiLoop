@@ -59,13 +59,13 @@ If no `config.md` exists, skip this step and treat `domain_config` as empty.
 
 ## Step 4: Environment Setup
 
-### 4.1 uv toolchain
+### 4.1 uv toolchain + PROJECT_ROOT uv project
 
 ```bash
-bash "{PLUGIN_ROOT}/scripts/run/setup-env.sh"
+bash "{PLUGIN_ROOT}/scripts/run/setup-env.sh" "{PROJECT_ROOT}"
 ```
 
-Verifies `uv` is on PATH (auto-installs it if missing). PROJECT_ROOT itself is **not** a uv project — the actual uv project is initialised inside the generated `<project-name>/` subdirectory by the `amphibious-code` agent during Phase 4 of `/build`.
+The script verifies `uv` is on PATH (auto-installs if missing) and runs `uv init --bare` in `PROJECT_ROOT` if no `pyproject.toml` is present. After it exits 0, `PROJECT_ROOT` is a uv project — every later phase (`install-deps.sh`, `amphibious-code` Phase 1.2, etc.) `uv add`s into this same env.
 
 - **Exit 0**: capture the `ENV_READY` block from stdout — it goes into `build_context.md` below.
 - **Exit non-zero**: surface the error and **stop the entire pipeline**.
@@ -76,7 +76,7 @@ Verifies `uv` is on PATH (auto-installs it if missing). PROJECT_ROOT itself is *
 
 ## Step 5: Write Build Context
 
-Write the consolidated context to `{PROJECT_ROOT}/.bridgic/build_context.md`. This file is the **single index** for the explore / code / verify agents — it tells them *what was decided* in Phases 1–2 and *where to find* every other artifact (TASK.md, reference docs, skills, env, prior phase outputs). Agents open the heavier files (TASK.md, references, SKILL.md) only when the work demands it.
+Write the consolidated context to `{PROJECT_ROOT}/.bridgic/build_context.md`. This file is the **single index** for the explore / code / verify agents — it tells them *what was decided* in Phases 1–2 and *where to find* every other artifact (TASK.md, user-supplied references, env, prior phase outputs). Agents open the heavier files (TASK.md, references, SKILL.md) only when the work demands it.
 
 Use this exact structure (omit any section whose body would be empty):
 
@@ -100,9 +100,7 @@ Use this exact structure (omit any section whose body would be empty):
 - plugin_root: {PLUGIN_ROOT}
 - project_root: {PROJECT_ROOT}
 - env_ready: |
-    <verbatim ENV_READY block from setup-env.sh stdout>
-- skills:
-    <skill-name>: <absolute path to its SKILL.md>
+    <verbatim ENV_READY block from setup-env.sh stdout, including the appended pyproject.toml dump>
 
 ## Outputs
 - exploration_report: (filled by Phase 3)
@@ -114,7 +112,7 @@ Section semantics:
 - **Task** — *what* this build is. `file:` points to the user-authored TASK.md (read on demand for description / expected_output / notes); `domain:` is the resolved selection from Phase 1.
 - **Pipeline** — *how* the generated project should run. `domain_config:` holds the answers from Step 3; if Step 3 captured nothing, omit the `domain_config` line entirely.
 - **References** — absolute paths to user-supplied reference material (resolved in Phase 1 from TASK.md "Domain References"). Read on demand. Omit the section if the user supplied none.
-- **Environment** — toolchain anchors. `env_ready:` is the verbatim block printed by `setup-env.sh`. `skills:` enumerates every directory under `{PLUGIN_ROOT}/skills/` that contains a `SKILL.md`, mapping skill name → absolute SKILL.md path; agents read those files on demand.
+- **Environment** — toolchain anchors. `env_ready:` is the verbatim block printed by `setup-env.sh` — it confirms `uv` is available and includes the current `pyproject.toml` so later agents see which packages and dependencies the shared uv env already has.
 - **Outputs** — placeholders that later phases fill in. Phase 3 replaces `(filled by Phase 3)` with the resolved exploration_report path; Phase 4 replaces `(filled by Phase 4)` with the generator_project path.
 
 After writing the file, return control to the calling command — the next phase is Exploration.

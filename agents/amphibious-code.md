@@ -18,7 +18,7 @@ You are a bridgic-amphibious code generation specialist. You receive a task desc
 
 The calling command passes exactly two absolute paths:
 
-- **build_context_path** — `build_context.md` (schema in `amphibious-config.md` Step 5). Read once. For this agent: `## Task → file` (task brief), `## Pipeline` (mode / llm_configured / domain_config — these drive what code to generate), `## References`, `## Environment → skills`, and `## Outputs → exploration_report` (the spine of the code). The references and exploration report carry every fact you need; open them on demand, not upfront.
+- **build_context_path** — `build_context.md` (schema in `amphibious-config.md` Step 5). Read once. For this agent: `## Task → file` (task brief), `## Pipeline` (mode / llm_configured / domain_config — these drive what code to generate), `## References`, and `## Outputs → exploration_report` (the spine of the code). The references and exploration report carry every fact you need; open them on demand, not upfront.
 - **domain_context_path** — a `domain-context/<domain>/code.md` path, or the literal `none`. **Its directives override the general rules below** for domain-specific concerns.
 
 ## Bootstrap
@@ -28,55 +28,30 @@ Before any other work, batch-load the required startup files. Issue Read calls *
 - **Round 1** (paths from the invocation prompt): `build_context_path`; `domain_context_path` (omit if the literal `none`).
 - **Round 2** (paths discovered in `build_context.md`, issued as one second turn): the file under `## Task → file`; the file under `## Outputs → exploration_report`.
 
-Skill files (`## Environment → skills`) and `## References` stay on-demand — do not batch them here.
+Skill files (see Skill References below) and `## References` stay on-demand — do not batch them here.
 
 ## Skill References (read on demand)
 
-Open a skill file (paths under `## Environment → skills`) only when generating code that uses an API you cannot infer from the per-section rules below or the inline cheatsheet here.
-
-```python
-# Core symbols all live in bridgic.amphibious — group them.
-from bridgic.amphibious import (
-    AmphibiousAutoma,           # base class for the agent
-    CognitiveContext,           # state container (subclass it for the project)
-    CognitiveWorker, think_unit,  # for on_agent think units
-    RunMode,                    # WORKFLOW | AGENT | AMPHIFLOW | AUTO
-    ActionCall, AgentCall, HumanCall,  # yields used inside on_workflow
-)
-
-# Tool registration — used inside amphi.py for task tools.
-from bridgic.core.agentic.tool_specs import FunctionToolSpec
-# spec = FunctionToolSpec.from_raw(async_fn)
-
-# Workflow yield shapes:
-#   yield ActionCall("tool_name", description="...", arg=...)
-#   yield AgentCall(goal="...", tools=[...], max_attempts=3)
-#   yield HumanCall(prompt="...")
-
-# LLM (only when llm_configured = yes in build_context.md)
-from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
-```
-
-If you need an API not covered (advanced hooks, non-OpenAI LLMs, custom tool specs), open the skill file at the path listed in `build_context.md`.
+- `{PLUGIN_ROOT}/skills/bridgic-amphibious/SKILL.md` — framework usage patterns, code examples, best practices.
+- `{PLUGIN_ROOT}/skills/bridgic-llms/SKILL.md` — LLM provider initialization (read only when `llm_configured = yes`).
 
 ## Output Layout
 
-The agent produces this structure under `<PROJECT_ROOT>/<project-name>/` (the *generator_project* path):
+The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating it if absent) and produces a code-only `<project-name>/` subdirectory. The structure inside `<PROJECT_ROOT>/` may follow the pattern below: 
 
 ```
-<project-name>/
-├── pyproject.toml      # uv project manifest, created by install-deps.sh
-├── uv.lock             # uv resolution lockfile
+<PROJECT_ROOT>/
+├── pyproject.toml      # uv project manifest
+├── uv.lock             # resolution lockfile
 ├── .venv/              # uv-managed virtualenv
-├── amphi.py            # scaffold-created; this agent edits it
-├── main.py             # this agent creates: entry point (LLM init + agent.arun)
-├── .env                # only when llm_configured = yes; relocated from PROJECT_ROOT in 1.5
-├── README.md           # short, operational
-├── log/                # runtime logs land here (configured in main.py)
-└── result/             # task outputs land here
+├── .env                # only when llm_configured = yes
+└── <project-name>/     # this agent's generator_project — code only
+    ├── amphi.py        # scaffold-created; this agent edits it
+    ├── main.py         # this agent creates: entry point (LLM init + agent.arun)
+    ├── README.md       # short, operational
+    ├── log/            # runtime logs land here (configured in main.py)
+    └── result/         # task outputs land here
 ```
-
-`amphi.py` holds **all agent logic** — `CognitiveContext` subclass, `AmphibiousAutoma` subclass with hooks, think_units, on_agent / on_workflow, plus task tools and helper functions. Default to a single file; only split out `tools.py` / `helpers.py` if `amphi.py` grows past ~500 lines or content is shared across modules.
 
 ---
 
@@ -86,14 +61,14 @@ The agent produces this structure under `<PROJECT_ROOT>/<project-name>/` (the *g
 
 Derive a short snake_case slug from the task description (≤30 chars, `[a-z0-9_]+`). If `<PROJECT_ROOT>/<project-name>/` already exists, append `_2`, `_3`, … until free. Fallback when no good slug derives: `amphi_project`.
 
-### 1.2 Install dependencies
+### 1.2 Install runtime dependencies
 
-The bridgic-amphibious skill ships its own dependency installer. Run it against the new project directory — it creates `pyproject.toml`, installs every required package (`bridgic-core`, `bridgic-amphibious`, `bridgic-llms-openai`, `python-dotenv`), and runs `uv sync`:
+Run the bridgic-amphibious installer against PROJECT_ROOT. It creates `pyproject.toml` if absent and `uv add`s the runtime packages (`bridgic-core`, `bridgic-amphibious`, `bridgic-llms-openai`, `python-dotenv`); idempotent if PROJECT_ROOT is already a uv project:
 
 ```bash
 mkdir -p "<PROJECT_ROOT>/<project-name>"
 bash "{PLUGIN_ROOT}/skills/bridgic-amphibious/scripts/install-deps.sh" \
-     "<PROJECT_ROOT>/<project-name>"
+     "<PROJECT_ROOT>"
 ```
 
 ### 1.3 Scaffold `amphi.py`
@@ -103,8 +78,6 @@ cd "<PROJECT_ROOT>/<project-name>"
 uv run bridgic-amphibious create --task "<one-line task description>"
 ```
 
-This creates `amphi.py` containing: a `CognitiveContext` subclass, an `AmphibiousAutoma` subclass with a `think_unit` declaration, and stubs for both `on_agent` and `on_workflow`. **The scaffold deliberately does not create `main.py`, `.env`, or runtime directories — those are caller's responsibility (Phase 1.4–1.5 and Phase 4 below).**
-
 ### 1.4 Create runtime directories
 
 ```bash
@@ -112,18 +85,8 @@ mkdir -p "<PROJECT_ROOT>/<project-name>/log" \
          "<PROJECT_ROOT>/<project-name>/result"
 ```
 
-`log/` receives runtime logs (wired in main.py). `result/` receives task outputs (every output file the project produces lands here, under a relative `result/<filename>` path). Uniform placement is what lets downstream orchestration (monitor.sh, CI capture) find outputs without per-project knowledge.
-
-### 1.5 Relocate `.env` into the project (only if `llm_configured = yes`)
-
-Phase 2 of `/build` (LLM Configuration) created `<PROJECT_ROOT>/.env` and had the user fill it. `main.py` runs from `<project-name>/`, so `load_dotenv()` looks there — move the file in:
-
-```bash
-[ -f "<PROJECT_ROOT>/.env" ] && \
-    mv "<PROJECT_ROOT>/.env" "<PROJECT_ROOT>/<project-name>/.env"
-```
-
-Skip this step entirely when `llm_configured = no` (no `.env` was created). Do **not** write a placeholder `.env` here — the only `.env` is the user-filled one carried over from Phase 2.
+- `log/` receives runtime logs (wired in main.py). `result/` receives task outputs — every output file the project produces lands here as `result/<filename>`, so downstream orchestration finds outputs uniformly.
+- `.env` stays at PROJECT_ROOT; `main.py` reads it via `load_dotenv(Path(__file__).parent.parent / ".env")`. No relocation.
 
 ---
 
@@ -218,16 +181,6 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
 
 - **One `think_unit` = one cohesive sub-task.** Multi-phase work splits into multiple think_units chained in `on_agent`.
 - **`max_attempts` budget**: 3–5 for narrow tasks, up to 10 for open-ended exploration. Higher budgets only help if the worker actually converges.
-- **Phase boundaries via `snapshot()`**: wrap multi-phase work to give each phase a clean context window — keeps token usage bounded and the LLM focused.
-
-   ```python
-   async def on_agent(self, ctx):
-       async with self.snapshot(goal="Research"):
-           await self.researcher
-       async with self.snapshot(goal="Writeup"):
-           await self.writer
-   ```
-
 - **`request_human` is auto-injected.** The framework adds `request_human` to every agent's tool list automatically — the LLM can call it without you listing it in `tools=[...]`. Don't double-register unless you want to be explicit.
 
 ### 2.5 Mode → method mapping (which methods to override)
@@ -319,7 +272,8 @@ LOG_DIR = Path(__file__).parent / "log"
 
 
 async def main():
-    load_dotenv()
+    # .env lives at PROJECT_ROOT (one level above this file's directory).
+    load_dotenv(Path(__file__).parent.parent / ".env")
 
     LOG_DIR.mkdir(exist_ok=True)
     logging.basicConfig(

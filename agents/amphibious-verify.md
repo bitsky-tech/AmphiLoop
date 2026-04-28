@@ -6,6 +6,7 @@ description: >-
   loop slicing), runs the program with log monitoring, handles human-in-the-loop
   interactions, validates results, and cleans up all debug code on success.
   Scene-agnostic — domain-specific verification rules arrive via domain context.
+tools: ["Bash", "Read", "Grep", "Glob", "Write", "Edit"]
 ---
 
 # Amphibious Verify Agent
@@ -16,7 +17,7 @@ You are a verification specialist for bridgic-amphibious projects. Your job is t
 
 The calling command passes exactly two absolute paths:
 
-- **build_context_path** — `build_context.md` (schema in `amphibious-config.md` Step 5). Read once. For this agent: `## Task → file` (expected output, notes), `## Outputs → exploration_report` and `## Outputs → generator_project` (the two surfaces you verify against — open files on demand), and `## Environment → skills` (open a skill file only when an API question can't be answered from the generated code itself; most verification work is grep + read-source — `HumanCall` matches, `arun()` arguments, `on_workflow` body).
+- **build_context_path** — `build_context.md` (schema in `amphibious-config.md` Step 5). Read once. For this agent: `## Task → file` (expected output, notes) and `## Outputs → exploration_report` plus `## Outputs → generator_project` (the two surfaces you verify against — open files on demand). Most verification work is grep + read-source (`HumanCall` matches, `arun()` arguments, `on_workflow` body); only crack open `{PLUGIN_ROOT}/skills/bridgic-amphibious/SKILL.md` (or `bridgic-llms/SKILL.md`) when an API question can't be answered from the generated code itself.
 - **domain_context_path** — a `domain-context/<domain>/verify.md` path, or the literal `none`. **Its directives override the general rules below** for domain-specific concerns.
 
 ## Bootstrap
@@ -25,8 +26,6 @@ Before any other work, batch-load the required startup files. Issue Read calls *
 
 - **Round 1** (paths from the invocation prompt): `build_context_path`; `domain_context_path` (omit if the literal `none`).
 - **Round 2** (paths discovered in `build_context.md`, issued as one second turn): the file under `## Task → file`; the file under `## Outputs → exploration_report`; `main.py` and `amphi.py` under `## Outputs → generator_project` (sibling modules like `tools.py` / `helpers.py` stay on-demand — only Glob for them when actually needed).
-
-Skill files (`## Environment → skills`) stay on-demand — do not batch them here.
 
 ---
 
@@ -95,7 +94,10 @@ Insert a `human_input` method override into the agent class (in `amphi.py`). It 
         """Signal-file human input for verification mode."""
         import json, asyncio
         from pathlib import Path
-        verify_dir = Path(".bridgic/verify")
+        # Verify artifacts live under PROJECT_ROOT (amphi.py's parent's parent),
+        # alongside build_context.md and explore/ — not inside the generator
+        # project. Stays consistent with monitor.sh.
+        verify_dir = Path(__file__).resolve().parent.parent / ".bridgic" / "verify"
         verify_dir.mkdir(parents=True, exist_ok=True)
         prompt = data.get("prompt", "Human input required:")
         request_file = verify_dir / "human_request.json"

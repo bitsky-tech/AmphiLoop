@@ -4,19 +4,31 @@
 
 - `{PLUGIN_ROOT}/skills/bridgic-browser/SKILL.md` — browser skill definitions and usage.
 
-## Observation protocol
+## Setup protocol
 
-Run both commands together before every action to capture the current environment state:
+Install the skill into PROJECT_ROOT — the single shared uv env reused by Phase 4:
 
 ```bash
-uv run bridgic-browser snapshot       # current tab's page state
-uv run bridgic-browser tabs           # all open tabs + which is active
+bash {PLUGIN_ROOT}/skills/bridgic-browser/scripts/install-deps.sh {PROJECT_ROOT}
 ```
 
-- Use `tabs` to track open tabs and identify the active tab so subsequent actions target the correct page context.
-- `snapshot` has two output modes (the CLI decides automatically):
-  - **Minimal content** — the full snapshot is printed to stdout; locate target elements directly in the terminal output.
-  - **Substantial content** — only a file path is printed; search for task-related keywords in that file, or read it in full to find the target elements and their refs.
+## Observation protocol
+
+Pick the call form by **command kind**:
+
+| Command | How to invoke |
+|---|---|
+| State-mutating **CLI action** (`open`, `click`, `wait`, …) | `bash {PLUGIN_ROOT}/domain-context/browser/script/browser-observe.sh [--wait <s>] -- <args...>` — runs the action, waits, then prints `=== ACTION ===` / `=== POST-ACTION TABS ===` / `=== POST-ACTION SNAPSHOT ===`. |
+| Observation (`snapshot`, `tabs`) or lifecycle (`close`) | `uv run bridgic-browser <cmd>` **directly**. |
+
+`--wait`: navigation / content-loading click **3–5s**; dropdown / text input **1–2s**; otherwise omit.
+
+**Hard rules:**
+
+1. **The wrapper REFUSES `snapshot`, `tabs`, `close`** — they are not actions; wrapping self-includes or runs on a dead browser. `bash browser-observe.sh -- tabs` fails with `refusing to wrap '<cmd>'` and burns a turn. Always call them via `uv run bridgic-browser <cmd>` directly.
+2. **Do not re-fetch `snapshot` / `tabs` after each action** — the wrapper already printed both. Re-fetching is the most common waste pattern. Direct calls are reserved for genuinely insufficient wrapper output (snapshot truncated, late render, tab-focus confirmation).
+
+Snapshot output (wrapper or direct) is either inline (minimal) or a file path (substantial — grep or read it).
 
 ## Ref classification — STABLE vs VOLATILE
 

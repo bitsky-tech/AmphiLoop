@@ -1,23 +1,32 @@
 #!/bin/bash
-# setup-env.sh — Verify the uv toolchain is available.
+# setup-env.sh — Ensure uv is available and PROJECT_ROOT is a uv project.
 #
-# PROJECT_ROOT is just a workspace (holds TASK.md and .bridgic/); the actual
-# uv project lives inside the generated subdirectory <project-name>/, which
-# is initialised later by the amphibious-code agent via the bridgic-amphibious
-# skill's install-deps.sh. This script only checks that uv is on PATH (auto-
-# installs it if not) so amphibious-code can run later without surprises.
+# 1. Checks uv is on PATH; auto-installs it on macOS/Linux/Windows if missing.
+# 2. Runs `uv init --bare` in PROJECT_DIR if no pyproject.toml is present.
+# 3. Prints an ENV_READY block followed by the verbatim pyproject.toml so
+#    callers see exactly which packages and dependencies the shared uv env
+#    currently has.
+#
+# After this script exits 0, PROJECT_DIR is a uv project (pyproject.toml +
+# .venv ready to grow). Per-skill `install-deps.sh` scripts and the
+# amphibious-code agent then `uv add` their packages into this same env —
+# the project-level uv env is shared across all later phases.
 #
 # Usage:
-#   setup-env.sh
+#   setup-env.sh [PROJECT_DIR]   (defaults to current directory)
 #
 # Exit codes:
-#   0  uv available
+#   0  uv available and pyproject.toml present
 #   1  uv installation failed
+#   2  uv init failed
 
 set -euo pipefail
 
+PROJECT_DIR="${1:-.}"
+cd "$PROJECT_DIR"
+
 # ──────────────────────────────────────────────
-# Ensure uv is installed
+# 1. Ensure uv is installed
 # ──────────────────────────────────────────────
 if ! command -v uv &>/dev/null; then
     echo "uv not found — installing ..."
@@ -48,6 +57,20 @@ fi
 
 echo "uv: $(uv --version 2>&1)"
 
+# ──────────────────────────────────────────────
+# 2. Initialize uv project (bare — no main.py / README scaffolding)
+# ──────────────────────────────────────────────
+if [ ! -f pyproject.toml ]; then
+    echo "No pyproject.toml found — running uv init --bare ..."
+    uv init --bare || { echo "Error: uv init failed."; exit 2; }
+    echo "Created pyproject.toml"
+else
+    echo "pyproject.toml already exists, skipping init"
+fi
+
 echo ""
 echo "=== ENV_READY ==="
 echo "uv: $(uv --version 2>&1)"
+echo "project_dir: $(pwd)"
+echo "--- pyproject.toml ---"
+cat pyproject.toml

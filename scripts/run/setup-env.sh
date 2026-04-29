@@ -1,8 +1,16 @@
 #!/bin/bash
-# setup-env.sh — Ensure uv is installed and initialize a uv project.
+# setup-env.sh — Ensure uv is available and PROJECT_ROOT is a uv project.
 #
-# 1. Checks if uv is on PATH. If not, auto-installs it (macOS/Linux/Windows).
-# 2. Runs `uv init --bare` in the working directory if pyproject.toml is absent.
+# 1. Checks uv is on PATH; auto-installs it on macOS/Linux/Windows if missing.
+# 2. Runs `uv init --bare` in PROJECT_DIR if no pyproject.toml is present.
+# 3. Prints an ENV_READY block followed by the verbatim pyproject.toml so
+#    callers see exactly which packages and dependencies the shared uv env
+#    currently has.
+#
+# After this script exits 0, PROJECT_DIR is a uv project (pyproject.toml +
+# .venv ready to grow). Per-skill `install-deps.sh` scripts and the
+# amphibious-code agent then `uv add` their packages into this same env —
+# the project-level uv env is shared across all later phases.
 #
 # Usage:
 #   setup-env.sh [PROJECT_DIR]   (defaults to current directory)
@@ -50,7 +58,7 @@ fi
 echo "uv: $(uv --version 2>&1)"
 
 # ──────────────────────────────────────────────
-# 2. Initialize uv project (bare — no main.py, README, etc.)
+# 2. Initialize uv project (bare — no main.py / README scaffolding)
 # ──────────────────────────────────────────────
 if [ ! -f pyproject.toml ]; then
     echo "No pyproject.toml found — running uv init --bare ..."
@@ -64,3 +72,5 @@ echo ""
 echo "=== ENV_READY ==="
 echo "uv: $(uv --version 2>&1)"
 echo "project_dir: $(pwd)"
+echo "--- pyproject.toml ---"
+cat pyproject.toml

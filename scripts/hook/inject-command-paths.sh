@@ -3,7 +3,7 @@
 #
 # A bridgic command can reach Claude via two independent paths:
 #
-#   (1) User types `/AmphiLoop:build-browser ...` directly.
+#   (1) User types `/AmphiLoop:build ...` directly.
 #       Claude Code expands the command inline as a <command-name> tag in the
 #       user turn. No Skill tool call happens — per the Skill tool's own rule,
 #       "if you see a <command-name> tag the skill has ALREADY been loaded,
@@ -12,7 +12,7 @@
 #         for a `/command` token matching one of our commands/*.md files.
 #
 #   (2) Claude auto-matches the user's natural-language task to a registered
-#       skill and invokes `Skill("build-browser")` itself.
+#       skill and invokes `Skill("build")` itself.
 #       → Hook point: PreToolUse with matcher "Skill". Detect by reading
 #         `tool_input.skill` from the stdin JSON.
 #
@@ -28,7 +28,7 @@ ROOT="${CLAUDE_PLUGIN_ROOT:-}"
 
 # Authoritative plugin name. MUST match .claude-plugin/plugin.json `name`.
 # Used to reject cross-plugin invocations that happen to share a bare command
-# name with us (e.g. another plugin exposing `OtherPlugin:build-browser`).
+# name with us (e.g. another plugin exposing `OtherPlugin:build`).
 # Without this gate, the hook would run globally and pollute unrelated flows.
 PLUGIN_NAME="AmphiLoop"
 
@@ -53,7 +53,7 @@ case "$HOOK_EVENT" in
     ;;
 esac
 
-# Resolve BARE_NAME (the unqualified command name, e.g. "build-browser") from
+# Resolve BARE_NAME (the unqualified command name, e.g. "build") from
 # whichever input shape applies to the current event.
 BARE_NAME=""
 
@@ -80,9 +80,9 @@ else
   # UserPromptSubmit: scan commands/ and look for a `/command` or
   # `/AmphiLoop:command` token in the `"prompt":"..."` JSON field. We don't
   # fully parse the prompt string — we just require the slash-command form to
-  # appear so natural-language prompts mentioning `/build-browser` in passing
+  # appear so natural-language prompts mentioning `/build` in passing
   # don't false-positive, AND we require any namespace prefix to be exactly
-  # `AmphiLoop:` so `/OtherPlugin:build-browser` is rejected.
+  # `AmphiLoop:` so `/OtherPlugin:build` is rejected.
   if [ -d "$ROOT/commands" ]; then
     for f in "$ROOT"/commands/*.md; do
       [ -f "$f" ] || continue
@@ -146,5 +146,5 @@ PWD_ESC=$(json_escape "$PWD")
 # newlines when rendering the additionalContext value back into the context.
 # permissionDecision is deliberately omitted so the PreToolUse branch only
 # adds context and does not override the permission flow of other hooks.
-printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"---\\nPLUGIN_ROOT=%s\\nPROJECT_ROOT=%s\\nUse these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PLUGIN_ROOT}/examples/..., {PROJECT_ROOT}/.bridgic/...\\n---"}}' "$HOOK_EVENT" "$ROOT_ESC" "$PWD_ESC"
+printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"---\\nPLUGIN_ROOT=%s\\nPROJECT_ROOT=%s\\nUse these as path prefixes: {PLUGIN_ROOT}/scripts/..., {PLUGIN_ROOT}/skills/..., {PLUGIN_ROOT}/templates/..., {PROJECT_ROOT}/.bridgic/...\\n---"}}' "$HOOK_EVENT" "$ROOT_ESC" "$PWD_ESC"
 exit 0

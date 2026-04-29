@@ -2,11 +2,9 @@
 
 [English](README.md) | 中文
 
-[Bridgic](https://github.com/bitsky-tech) 生态的 Agent 技能与知识语料库 — 提供 skills、agents 和 commands，用于构建 LLM 驱动与确定性双模执行的项目。
+AmphiLoop，全称是Amphibious Loop （两栖循环），是一套全新的AI智能体构建方法论、技术栈和工具链。它允许我们使用自然语言对任务进行描述和编排，由一个「探路 - 编码- 验证」循环来引导代码生成和构建过程，并且产物具备运行时在workflow模式和agent模式之间自动切换的能力。
 
-## 什么是 AmphiLoop？
-
-AmphiLoop 是一个**语料库**，将领域知识和执行方法论封装为三层结构：
+AmphiLoop 将领域知识和执行方法论封装为三层结构：
 
 | 层级 | 角色 | 描述 |
 |------|------|------|

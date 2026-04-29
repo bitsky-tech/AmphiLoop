@@ -26,11 +26,13 @@ claude plugin marketplace add bitsky-tech/AmphiLoop
 claude plugin install AmphiLoop
 ```
 
-或从本地仓库直接安装：
+或从本地仓库安装（把 `marketplace add` 指向本地目录即可——本仓库自带 `.claude-plugin/marketplace.json`，会被识别为 marketplace）：
 
 ```bash
 git clone https://github.com/bitsky-tech/AmphiLoop.git
-claude plugin install /path/to/AmphiLoop
+
+claude plugin marketplace add /path/to/AmphiLoop
+claude plugin install AmphiLoop
 ```
 
 安装后，skills、agents 和 commands（如 `/build`）会自动在 Claude Code 中可用。

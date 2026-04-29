@@ -26,11 +26,12 @@ claude plugin marketplace add bitsky-tech/AmphiLoop
 claude plugin install AmphiLoop
 ```
 
-Or install directly from a local checkout:
+Or install from a local checkout (point `marketplace add` at the local directory — it's read as a marketplace because the repo ships `.claude-plugin/marketplace.json`):
 
 ```bash
 git clone https://github.com/bitsky-tech/AmphiLoop.git
-claude plugin install /path/to/AmphiLoop
+claude plugin marketplace add /path/to/AmphiLoop
+claude plugin install AmphiLoop
 ```
 
 After installation, skills, agents, and commands (e.g. `/build`) are automatically available in Claude Code.

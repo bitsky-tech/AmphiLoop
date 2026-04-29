@@ -193,16 +193,14 @@ def fetch_description(repo):
         return ''
 
 rows = [
-    '| Skill | Source Repo | Ref | Description |',
-    '|-------|------------|-----|-------------|',
+    '| Skill | Source Repo | Description |',
+    '|-------|------------|-------------|',
 ]
 for skill in c.sections():
     repo = c[skill]['repo']
-    ref = c[skill]['ref']
     desc = fetch_description(repo)
     repo_link = f'[\`{repo}\`](https://github.com/{repo})'
-    ref_display = f'\`{ref}\`'
-    rows.append(f'| {skill} | {repo_link} | {ref_display} | {desc} |')
+    rows.append(f'| {skill} | {repo_link} | {desc} |')
 
 print('\n'.join(rows))
 " "$MANIFEST")

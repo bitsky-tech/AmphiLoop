@@ -26,36 +26,52 @@ claude plugin marketplace add bitsky-tech/AmphiLoop
 claude plugin install AmphiLoop
 ```
 
-Or install directly from a local checkout:
+Or install from a local checkout (point `marketplace add` at the local directory — it's read as a marketplace because the repo ships `.claude-plugin/marketplace.json`):
 
 ```bash
 git clone https://github.com/bitsky-tech/AmphiLoop.git
-claude plugin install /path/to/AmphiLoop
+claude plugin marketplace add /path/to/AmphiLoop
+claude plugin install AmphiLoop
 ```
 
-After installation, skills, agents, and commands (e.g. `/build-browser`) are automatically available in Claude Code.
+After installation, skills, agents, and commands (e.g. `/build`) are automatically available in Claude Code.
 
 ## Usage
 
 ### Commands
 
-Commands are user-invocable workflows. Type them directly:
+Commands are user-invocable workflows. Invoke them with the `/` prefix:
 
-#### `/build-browser`
+#### `/AmphiLoop:build`
+
+Unified pipeline. Describe any task, list the domain references the agents should read (SKILLs, CLI help, SDK docs, style guides), and ask to generate a runnable project:
 
 ```
-/build-browser
+/AmphiLoop:build
 
-Task: Go to https://example.com, search for "product", and extract the first 5 results
+I want to aggregate all `orders_*.csv` files under ~/data/inputs into a single
+summary.csv — one row per customer with totals.
 ```
+
+**Domain flag (optional)** — append `--<domain>` to inject pre-distilled domain context from `domain-context/<domain>/`. Currently supported: `--browser`.
+
+```
+/AmphiLoop:build --browser
+
+Go to https://example.com, search for "product", and extract the first 5 results.
+I want a project that can run this reliably.
+```
+
+Without a flag, `/build` auto-detects the domain from `TASK.md` (and falls back to a generic flow if none matches). Users can always supply additional domain references in `TASK.md`.
 
 **What happens under the hood:**
 
-1. **Parse** — Extracts URL, goal, and expected output from your task description
-2. **Setup** — Checks environment (uv, dependencies, `.env`)
-3. **Explore** — Delegates to `browser-explorer` agent to systematically explore the target website via CLI
-4. **Generate** — Delegates to `amphibious-generator` agent to produce a complete project with all source files
-5. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
+1. **Initialize Task** — Writes a `TASK.md` template where you fill in goal, expected output, and **Domain References**; auto-detects the domain if no flag was given
+2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow), LLM config if needed, plus any domain-specific configuration (e.g. browser environment mode when `--browser` is active)
+3. **Setup Environment** — Checks `uv`, runs `uv init`
+4. **Explore** — Delegates to `amphibious-explore` agent, which reads your domain references and probes the environment
+5. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
+6. **Verify** — Delegates to `amphibious-verify` agent to inject debug instrumentation, run the project, and validate results
 
 ### Agents
 
@@ -63,8 +79,8 @@ Agents are execution specialists delegated by commands. They are not called dire
 
 | Agent | What It Does |
 |-------|-------------|
-| **browser-explorer** | Systematically explores a website via CLI, produces a structured exploration report with snapshots |
-| **amphibious-generator** | Generates a complete bridgic-amphibious project from a task description and exploration report |
+| **amphibious-explore** | Systematically explores a target environment via a domain-supplied toolset, produces an executable plan with stability-annotated operations and supporting snapshots |
+| **amphibious-code** | Generates a complete bridgic-amphibious project from a task description and exploration report |
 | **amphibious-verify** | Injects debug instrumentation, runs the project with monitoring, validates results, and cleans up |
 
 ### Skills
@@ -73,9 +89,7 @@ Skills are domain knowledge references that agents and Claude load automatically
 
 | Skill | Activates When |
 |-------|---------------|
-| **bridgic-basic** | Working with Bridgic core framework (Worker, Automa, GraphAutoma, ASL) |
 | **bridgic-browser** | Using browser automation via CLI (`bridgic-browser ...`) or Python SDK (`from bridgic.browser`) |
-| **bridgic-browser-agent** | Building browser automation agents with OOP patterns and dynamic ref resolution |
 | **bridgic-amphibious** | Building dual-mode agents with `AmphibiousAutoma`, `CognitiveWorker`, `on_agent`/`on_workflow` |
 | **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `OpenAILikeLlm`, `VllmServerLlm`) |
 
@@ -84,30 +98,35 @@ Skills are domain knowledge references that agents and Claude load automatically
 ```
 AmphiLoop/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin registration
-├── skills/                      # Domain knowledge (5 skills)
-│   ├── bridgic-basic/           #   Core framework concepts
+│   ├── plugin.json              # Plugin registration
+│   └── marketplace.json         # Marketplace metadata
+├── skills/                      # Domain knowledge (3 skills)
+│   ├── manifest.ini             #   Skill source registry (repo, ref, paths)
+│   ├── README.md                #   Manifest docs + auto-generated skill table
 │   ├── bridgic-browser/         #   Browser automation CLI + SDK
-│   ├── bridgic-browser-agent/   #   Browser agent patterns
 │   ├── bridgic-amphibious/      #   Dual-mode agent framework
 │   └── bridgic-llms/            #   LLM provider integration
 ├── agents/                      # Execution methodology (3 agents)
-│   ├── browser-explorer.md      #   CLI exploration expert
-│   ├── amphibious-generator.md  #   Code generation expert
+│   ├── amphibious-explore.md    #   Abstract exploration methodology
+│   ├── amphibious-code.md       #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert
 ├── commands/                    # User-invocable workflows
-│   └── build-browser.md         #   End-to-end pipeline
-├── examples/                    # Static example docs (not auto-scanned)
-│   └── build-browser-code-patterns.md
+│   └── build.md                 #   Unified pipeline (accepts optional --<domain> flag)
+├── domain-context/              # Pre-distilled per-domain context injected by /build
+│   └── browser/                 #   intent.md, config.md, explore.md, code.md, verify.md (+ script/)
+├── templates/                   # Static templates read by commands (not auto-scanned)
+│   └── build-task-template.md         #   Unified TASK.md template used by /build
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations
     ├── hook/
     │   └── inject-command-paths.sh
-    └── run/
-        ├── setup-env.sh            #   Environment setup (uv, deps, playwright)
-        ├── check-dotenv.sh         #   LLM configuration validation
-        └── monitor.sh
+    ├── run/
+    │   ├── setup-env.sh         #   Verify uv toolchain; uv init --bare in PROJECT_ROOT
+    │   ├── check-dotenv.sh      #   LLM configuration validation
+    │   └── monitor.sh           #   Run-and-monitor for amphibious-verify
+    └── maintenance/
+        └── sync-skills.sh       #   Sync skills from source repos via manifest.ini
 ```
 
 ### How the Layers Connect

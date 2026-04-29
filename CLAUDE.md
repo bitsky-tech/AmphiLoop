@@ -8,7 +8,8 @@ Agent skill & knowledge corpus for the Bridgic ecosystem — providing skills, a
 AmphiLoop/
 ├── CLAUDE.md                          ← this file
 ├── .claude-plugin/
-│   └── plugin.json                    ← Claude Code plugin registration
+│   ├── plugin.json                    ← Claude Code plugin registration
+│   └── marketplace.json               ← marketplace metadata
 ├── skills/                            ← domain knowledge: "what it is, how to use it"
 │   ├── manifest.ini                  ← skill source registry (repo, ref, paths)
 │   ├── README.md                      ← manifest docs + auto-generated skill table
@@ -16,24 +17,26 @@ AmphiLoop/
 │   ├── bridgic-amphibious/            ← dual-mode agent framework
 │   └── bridgic-llms/                  ← LLM providers and initialization
 ├── agents/                            ← execution methodology: "how to do it well"
-│   ├── browser-explorer.md            ← CLI exploration expertise
-│   ├── amphibious-generator.md        ← code generation expertise
+│   ├── amphibious-config.md           ← inline-loaded by /build Phase 2 (interactive; NOT a subagent)
+│   ├── amphibious-explore.md          ← abstract exploration methodology
+│   ├── amphibious-code.md             ← code generation expertise
 │   └── amphibious-verify.md           ← project verification expertise
 ├── commands/                          ← user-invocable workflows (thin orchestrators)
-│   └── build-browser.md               ← /build-browser pipeline
-├── examples/                          ← static example docs (not auto-scanned by Claude Code)
-│   ├── build-browser-code-patterns.md ← browser-specific code patterns
-│   └── build-browser-task-template.md ← TASK.md template for /build-browser Phase 1
+│   └── build.md                       ← /build pipeline (domain-agnostic; accepts --<domain>)
+├── domain-context/                    ← pre-distilled per-domain context injected by /build
+│   └── browser/                       ← intent.md, config.md, explore.md, code.md, verify.md
+│       └── script/                    ← domain-only helpers (e.g. browser-observe.sh)
+├── templates/                         ← static templates read by commands (not auto-scanned by Claude Code)
+│   └── build-task-template.md         ← unified TASK.md template (used by /build Phase 1)
 ├── hooks/                             ← auto-loaded by Claude Code
-│   ├── hooks.json                     ← hook definitions
-│   └── README.md                      ← hook system documentation
+│   └── hooks.json                     ← hook definitions
 └── scripts/
     ├── hook/                          ← hook script implementations
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     ├── run/                           ← runtime scripts used by agents
-    │   ├── setup-env.sh               ← auto-install uv + uv init --bare
+    │   ├── setup-env.sh               ← verify uv toolchain (auto-installs if missing) and run `uv init --bare` in PROJECT_ROOT
     │   ├── check-dotenv.sh            ← .env LLM configuration validation
-    │   └── monitor.sh                 ← process monitor for amphibious-verify agent
+    │   └── monitor.sh                 ← run-and-monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)
         └── sync-skills.sh             ← sync skills from source repos via manifest.ini
 ```
@@ -43,8 +46,9 @@ AmphiLoop/
 | Type | Purpose | Example |
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
-| **Agent** | Deep execution methodology — delegated by commands | browser-explorer, amphibious-generator, amphibious-verify |
-| **Command** | Multi-step orchestrator invoked by user | /build-browser |
+| **Agent** | Deep execution methodology — delegated by commands | amphibious-explore, amphibious-code, amphibious-verify |
+| **Command** | Multi-step orchestrator invoked by user | /build |
+| **Domain Context** | Pre-distilled per-domain rules (`intent.md`, `config.md`, `explore.md`, `code.md`, `verify.md`) injected by `/build` when a domain is selected explicitly via `--<domain>` or auto-detected from `TASK.md` | domain-context/browser |
 
 ## Installation
 
@@ -66,12 +70,12 @@ claude plugin install AmphiLoop
 
 | Agent | When to Use |
 |-------|-------------|
-| **browser-explorer** | Systematically explore a website via CLI, produce structured exploration report |
-| **amphibious-generator** | Generate a complete bridgic-amphibious project from a task description with optional domain context |
+| **amphibious-explore** | Systematically explore a target environment via a domain toolset, produce an executable plan with stability-annotated operations |
+| **amphibious-code** | Generate a complete bridgic-amphibious project from a task description with optional domain context |
 | **amphibious-verify** | Verify a generated amphibious project: inject debug instrumentation, run with monitoring, validate results, clean up |
 
 ## Commands
 
 | Command | When to Use |
 |---------|-------------|
-| **/build-browser** | Turn a browser task into a working bridgic-amphibious project (parse → explore → generate → verify) |
+| **/build** | Unified entry point. Turn any task into a working bridgic-amphibious project. Accepts an optional domain flag (`/build --browser`) to inject pre-distilled context from `domain-context/<domain>/`. Without a flag, auto-detects the domain from `TASK.md` (or falls back to a generic flow). Users may additionally supply their own domain references in `TASK.md`. |

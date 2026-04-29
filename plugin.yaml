@@ -1,0 +1,6 @@
+name: amphi-loop
+version: 1.0.0
+description: "AmphiLoop pipeline ported to Hermes — turns any task into a working bridgic-amphibious project. Orchestrates init → configure → explore → code → verify, dispatching phases 3/4/5 to isolated subagents via delegate_task."
+author: "AmphiLoop"
+license: MIT
+homepage: https://github.com/bitsky-tech/AmphiLoop

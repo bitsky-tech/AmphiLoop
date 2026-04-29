@@ -9,9 +9,11 @@ This document defines the **Configure & Setup** phase: project-mode selection, L
 - `SELECTED_DOMAIN` — domain name (e.g. `browser`) or unresolved (generic flow).
 - TASK.md content already extracted: Task Description, Expected Output, Domain References (resolved absolute paths), Notes.
 
+> **Host runtime note** — wherever this document says "ask the user" or "present via the host's clarification tool", use `AskUserQuestion` on Claude Code or `clarify` on Hermes. The questions and choices are identical on both hosts.
+
 ## Step 1: Project Mode
 
-Present via `AskUserQuestion`:
+Present to the user via the host's clarification tool:
 
 > Choose project mode:
 >
@@ -38,7 +40,7 @@ Decide whether to set up LLM — set `llm_configured` to `yes` or `no`.
 
 - **If `project_mode == workflow`**: analyze the task description.
 
-  - **If task contains AI-suggestive operations** (e.g. "extract key information", "analyze content", "generate a report"), ask via `AskUserQuestion`:
+  - **If task contains AI-suggestive operations** (e.g. "extract key information", "analyze content", "generate a report"), ask the user:
 
     > Your task description mentions operations that may benefit from AI/LLM capabilities (e.g. content analysis, intelligent extraction). Configure an LLM?
     >
@@ -52,7 +54,7 @@ Decide whether to set up LLM — set `llm_configured` to `yes` or `no`.
 
 ## Step 3: Domain-specific Configuration
 
-If `SELECTED_DOMAIN` is resolved AND `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/config.md` exists, read that file and follow its instructions verbatim — it tells you which questions to ask the user (still via `AskUserQuestion`) and which keys to record. Capture each answer as `domain_config[<key>] = <value>`.
+If `SELECTED_DOMAIN` is resolved AND `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/config.md` exists, read that file and follow its instructions verbatim — it tells you which questions to ask the user (via the host's clarification tool) and which keys to record. Capture each answer as `domain_config[<key>] = <value>`.
 
 If no `config.md` exists, skip this step and treat `domain_config` as empty.
 

@@ -83,7 +83,7 @@ fi
 if [ -z "$PID" ]; then
     rm -f "${VERIFY_DIR}/human_request.json" "${VERIFY_DIR}/human_response.json"
     : > "$LOG_FILE"
-    nohup bash -c "cd '$WORK_DIR' && uv run python main.py" >> "$LOG_FILE" 2>&1 &
+    nohup bash -c "unset VIRTUAL_ENV && cd '$WORK_DIR' && '${BRIDGIC_ARTIFACT_ROOT}/.venv/bin/python3' main.py" >> "$LOG_FILE" 2>&1 &
     PID=$!
     echo "$PID" > "$PID_FILE"
     echo "=== MONITOR: STARTED PID=$PID ==="

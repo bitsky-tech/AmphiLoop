@@ -4,6 +4,8 @@ English | [中文](README-zh.md)
 
 Agent skill & knowledge corpus for the [Bridgic](https://github.com/bitsky-tech) ecosystem — a corpus that provides skills, agents, and commands for building projects powered by LLM-driven and deterministic dual-mode execution.
 
+
+
 ## What is AmphiLoop?
 
 AmphiLoop is a **Corpus** that packages domain knowledge and execution methodology into three layers:
@@ -15,6 +17,13 @@ AmphiLoop is a **Corpus** that packages domain knowledge and execution methodolo
 | **Commands** | Orchestration | Multi-step workflows that coordinate agents and skills |
 
 Together, they enable an end-to-end pipeline: **explore a website via CLI** -> **generate a dual-mode agent project** -> **verify execution** — all within an agent.
+
+## Further Reading
+
+Long-form pieces on the motivation and design philosophy behind AmphiLoop:
+
+- English — [Beyond Autonomous: Why I'm Building an Amphibious Agent](https://pub.towardsai.net/beyond-autonomous-why-im-building-an-amphibious-agent-fcae9a409220)
+- 中文 — [万字长文！两栖模式构建Agent，与OpenClaw/Hermes不一样的解法——开源AmphiLoop](https://zhangtielei.com/posts/blog-bridgic-amphiloop.html)
 
 ## Installation
 

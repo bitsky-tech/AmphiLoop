@@ -1,13 +1,35 @@
-# Amphibious Config — Inline Methodology
+---
+name: amphibious-config
+description: >-
+  Configuration specialist for the bridgic-amphibious build pipeline. Drives
+  interactive selection of project mode (Workflow / Amphiflow) and LLM
+  configuration, applies any domain-specific configuration from
+  domain-context/<domain>/config.md, runs the uv environment setup script,
+  and writes the consolidated build_context.md that every later phase reads.
+  Interactive — runs inline in the calling command's thread (needs
+  AskUserQuestion), not as a subagent.
+tools: ["AskUserQuestion", "Bash", "Read", "Write"]
+---
 
-This document defines the **Configure & Setup** phase: project-mode selection, LLM configuration, optional domain-specific configuration, environment initialization (`uv` project), and writing the consolidated `build_context.md` that all later agents read.
+# Amphibious Config Agent
 
-## Inputs
+You are a build-pipeline configuration specialist. Your job is to interactively determine project-mode / LLM / domain-specific settings, run environment setup, and write the consolidated `build_context.md` that every later agent reads.
 
-- `PLUGIN_ROOT` — absolute path to the plugin root.
-- `PROJECT_ROOT` — absolute path to the user's working directory.
-- `SELECTED_DOMAIN` — domain name (e.g. `browser`) or unresolved (generic flow).
-- TASK.md content already extracted: Task Description, Expected Output, Domain References (resolved absolute paths), Notes.
+## Input
+
+The calling command passes the inputs already established in Phase 1 of `/build`:
+
+- **PLUGIN_ROOT / PROJECT_ROOT** — absolute path placeholders used throughout this document.
+- **SELECTED_DOMAIN** — resolved domain name (e.g. `browser`), or unresolved if the user opted into the generic flow.
+- **TASK.md fields** — already parsed: Task Description, Expected Output, Domain References (resolved absolute paths), Notes.
+
+Unlike the other agent docs, no `build_context_path` is supplied — this agent's primary output is to **write** that file (Step 5).
+
+## Bootstrap
+
+This agent runs interactively from the very first step; there are no startup files to batch-load. Each Step below opens whatever it needs on demand.
+
+---
 
 ## Step 1: Project Mode
 

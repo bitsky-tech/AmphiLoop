@@ -29,24 +29,19 @@ Anything else in `$ARGUMENTS` (extra tokens, multiple flags) → stop and ask th
 
 ```
 1. Initialize Task          (this command — generate TASK.md template, user fills in; then auto-detect domain if not flagged)
-2. Configure & Setup        (this command — user interactions; writes build_context.md)
-3. Exploration              (→ amphibious-explore agent)
-4. Generate Amphibious Code (→ amphibious-code agent)
-5. Verify                   (→ amphibious-verify agent)
+2. Configure & Setup        (this command — inline methodology; user interactions; writes build_context.md)
+3. Exploration              (this command — inline methodology; may invoke human-in-the-loop)
+4. Generate Amphibious Code (→ amphibious-code subagent)
+5. Verify                   (this command — inline methodology; may invoke human-in-the-loop)
 ```
 
 > **Path variables**: `{PLUGIN_ROOT}` and `{PROJECT_ROOT}` are path placeholders — all paths below use these prefixes. If either is missing, the plugin was not loaded correctly — do not proceed.
-
-## Agent invocation contract
-
-Phases 3, 4, and 5 each delegate to a subagent. **Every delegation passes exactly two absolute paths**:
-
-- **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
-- **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
+> **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
+> **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
 
 After Phases 3 and 4, refresh `build_context.md` in two places:
 
-1. **Outputs** — replace the matching `(filled by Phase N)` placeholder with the agent's primary output path.
+1. **Outputs** — replace the matching `(filled by Phase N)` placeholder with the phase's primary output path.
 2. **env_ready** — read `{PROJECT_ROOT}/pyproject.toml` and update the dump under `--- pyproject.toml ---` inside the `env_ready:` block with its current contents.
 
 ---
@@ -87,7 +82,7 @@ After this step `SELECTED_DOMAIN` is either a valid domain name or unresolved (g
 
 ## Phase 2: Configure & Setup
 
-**Execute yourself** by reading `{PLUGIN_ROOT}/agents/amphibious-config.md` and following its steps in order, in this thread, with the inputs already established in Phase 1 (`PLUGIN_ROOT`, `PROJECT_ROOT`, `SELECTED_DOMAIN`, and the parsed TASK.md fields).
+**Execute** by reading `{PLUGIN_ROOT}/agents/amphibious-config.md` and following its steps in order.
 
 The methodology document covers, in this order:
 
@@ -105,13 +100,15 @@ On successful completion, `{PROJECT_ROOT}/.bridgic/build_context.md` exists and 
 
 ## Phase 3: Exploration
 
-Delegate to **`amphibious-explore`** (per Agent invocation contract). Do not start Phase 4 until exploration is complete — the report and artifact files under `{PROJECT_ROOT}/.bridgic/explore/` are the sole bridge between Phase 3 and Phase 4. After the agent returns, fill `## Outputs → exploration_report` in `build_context.md`.
+**Execute** by reading `{PLUGIN_ROOT}/agents/amphibious-explore.md` and following its steps in order.
+
+Do not start Phase 4 until exploration is complete — the report and artifact files under `{PROJECT_ROOT}/.bridgic/explore/` are the sole bridge between Phase 3 and Phase 4. After exploration finishes, fill `## Outputs → exploration_report` in `build_context.md`.
 
 ---
 
 ## Phase 4: Generate Amphibious Code
 
-Delegate to **`amphibious-code`** (per Agent invocation contract). The agent reads `## Pipeline → mode` and `llm_configured` from `build_context.md` and applies its own mode-/LLM-mapping rules.
+Delegate to the **`amphibious-code`** subagent, passing `build_context_path` and `domain_context_path` per the Phase context contract above. The agent reads `## Pipeline → mode` and `llm_configured` from `build_context.md` and applies its own mode-/LLM-mapping rules.
 
 After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) in `build_context.md`.
 
@@ -119,4 +116,4 @@ After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_
 
 ## Phase 5: Verify
 
-Delegate to **`amphibious-verify`** (per Agent invocation contract).
+**Execute** by reading `{PLUGIN_ROOT}/agents/amphibious-verify.md` and following its steps in order.

@@ -6,9 +6,7 @@
     "./commands/"
   ],
   "agents": [
-    "./agents/amphibious-explore.md",
-    "./agents/amphibious-code.md",
-    "./agents/amphibious-verify.md"
+    "./agents/amphibious-code.md"
   ],
   "skills": []
 }

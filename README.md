@@ -22,8 +22,7 @@ Together, they enable an end-to-end pipeline: **explore a website via CLI** -> *
 
 Long-form pieces on the motivation and design philosophy behind AmphiLoop:
 
-- English — [Beyond Autonomous: Why I'm Building an Amphibious Agent](https://pub.towardsai.net/beyond-autonomous-why-im-building-an-amphibious-agent-fcae9a409220)
-- 中文 — [万字长文！两栖模式构建Agent，与OpenClaw/Hermes不一样的解法——开源AmphiLoop](https://zhangtielei.com/posts/blog-bridgic-amphiloop.html)
+[Beyond Autonomous: Why I'm Building an Amphibious Agent](https://pub.towardsai.net/beyond-autonomous-why-im-building-an-amphibious-agent-fcae9a409220)
 
 ## Installation
 

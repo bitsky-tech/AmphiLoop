@@ -20,8 +20,7 @@ AmphiLoop 是一个**语料库**，将领域知识和执行方法论封装为三
 
 关于 AmphiLoop 设计动机与思想的长文：
 
-- 英文版 — [Beyond Autonomous: Why I'm Building an Amphibious Agent](https://pub.towardsai.net/beyond-autonomous-why-im-building-an-amphibious-agent-fcae9a409220)
-- 中文版 — [万字长文！两栖模式构建Agent，与OpenClaw/Hermes不一样的解法——开源AmphiLoop](https://zhangtielei.com/posts/blog-bridgic-amphiloop.html)
+[万字长文！两栖模式构建Agent，与OpenClaw/Hermes不一样的解法——开源AmphiLoop](https://zhangtielei.com/posts/blog-bridgic-amphiloop.html)
 
 ## 安装
 

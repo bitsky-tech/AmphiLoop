@@ -37,7 +37,7 @@ Skill files (see Skill References below) and `## References` stay on-demand — 
 
 ## Output Layout
 
-The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating it if absent) and produces a code-only `<project-name>/` subdirectory. The structure inside `<PROJECT_ROOT>/` may follow the pattern below: 
+The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating it if absent) and produces a code-only `<project-name>/` subdirectory. The structure inside `<PROJECT_ROOT>/` may follow the pattern below:
 
 ```
 <PROJECT_ROOT>/

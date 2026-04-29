@@ -69,7 +69,7 @@ For every step, follow the loop:
 
 1. **Observe** — enter every iteration holding a **fresh view** of the environment's current state, Decide reasons about reality rather than memory. There are two ways to satisfy this:
    - *Default — run the observation command.* Invoke the observation command(s) derived in **Analyse Task** at the start of the iteration. This is the safe path and is the expected behavior unless the shortcut below clearly applies.
-   - *Shortcut — reuse the prior Act's return.* If the previous iteration's Act already returned a value that fully describes the post-action state, you are already holding a fresh view and may proceed directly to make decision without a separate observation call. 
+   - *Shortcut — reuse the prior Act's return.* If the previous iteration's Act already returned a value that fully describes the post-action state, you are already holding a fresh view and may proceed directly to make decision without a separate observation call.
 2. **Decide** — compare observed state against the task goal; pick the next action from the tool's action vocabulary (consult SKILL.md / `--help` / SDK docs as needed). Respect any guidance-based directives extracted in **Analyse Task**.
 3. **Act** — execute the chosen action.
 4. **Record** — capture the operation, its parameters, and each parameter's stability classification (see below).
@@ -80,7 +80,7 @@ Do not advance the plan without observing first. Classify a parameter **only whe
 
 #### 1. Critical Operation Sequence
 
-This is the primary deliverable — **the complete task structure expressed as an executable flow**. 
+This is the primary deliverable — **the complete task structure expressed as an executable flow**.
 
 Firstly, Capture every structural element needed to reproduce the task end-to-end:
 
@@ -132,12 +132,12 @@ Write `exploration_report.md` plus all saved artifact files. The report has **up
 
 ### 1. Domain Guidance
 
-Based on the results of the Analyse Task, relevant insights have been obtained through analysis. 
-- If there is any, add this section to the report and explain. Keep each entry to a few lines: 
+Based on the results of the Analyse Task, relevant insights have been obtained through analysis.
+- If there is any, add this section to the report and explain. Keep each entry to a few lines:
    - **Observation protocol** — the concrete command(s) that surface the current environment state.
    - **Cleanup protocol** — command(s) to release resources when a run ends.
    - **Applicable directives** — rules, patterns, and constraints the plan must respect (near-verbatim; do not paraphrase away specificity). Cite the source reference when multiple are in play.
-Otherwise, this section is not necessary. 
+Otherwise, this section is not necessary.
 
 ### 2. Operation Sequence
 

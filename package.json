@@ -1,0 +1,10 @@
+{
+  "name": "amphiloop-openclaw-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw plugin manifest for AmphiLoop. Required so OpenClaw classifies AmphiLoop as a native plugin instead of falling back to Claude Code bundle detection (.claude-plugin/plugin.json). All actual logic lives in the bundled skill at extensions/openclaw-skill/amphiloop-build/.",
+  "openclaw": {
+    "extensions": ["./openclaw-entry.mjs"]
+  }
+}

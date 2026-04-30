@@ -79,3 +79,18 @@ claude plugin install AmphiLoop
 | Command | When to Use |
 |---------|-------------|
 | **/build** | Unified entry point. Turn any task into a working bridgic-amphibious project. Accepts an optional domain flag (`/build --browser`) to inject pre-distilled context from `domain-context/<domain>/`. Without a flag, auto-detects the domain from `TASK.md` (or falls back to a generic flow). Users may additionally supply their own domain references in `TASK.md`. |
+
+## OpenClaw Integration
+
+The AmphiLoop repository **is** an OpenClaw native plugin. Installing it (`openclaw plugins install <repo> --link`) auto-registers a bundled skill that exposes `/amphiloop_build "<task spec>"` in any OpenClaw chat surface.
+
+| Aspect | How it works |
+|--------|--------------|
+| **Plugin install** | `openclaw plugins install /abs/path/AmphiLoop-02 --link` then `openclaw gateway restart`. Setup + verification details in `extensions/openclaw-skill/README.md`. |
+| **Native classification** | Three small files at repo root — `openclaw.plugin.json` (manifest), `package.json` (with `openclaw.extensions: ["./openclaw-entry.mjs"]`), and `openclaw-entry.mjs` (no-op entry) — make OpenClaw classify AmphiLoop as **native** (`Format: openclaw`) instead of falling back to Claude Code bundle detection from `.claude-plugin/plugin.json`. |
+| **Bundled skill** | The plugin manifest declares `"skills": ["./extensions/openclaw-skill"]`; OpenClaw auto-discovers `amphiloop-build/SKILL.md` under that directory. |
+| **Orchestration** | The OpenClaw host model drives Phases 2–3 (config + explore) directly, reading the methodology from `agents/amphibious-*.md` via the `{baseDir}/../..` path resolution. |
+| **Code generation (host ↔ coding-agent)** | Host writes `<projectRoot>/.amphiloop/AGENT_BRIEF.md` (lists the bridgic-* SKILL.md files the worker MUST read for correct API usage) + `<projectRoot>/.amphiloop/TODOS.md` (task list). Then opens **one** long-lived OpenClaw `coding-agent` session and sends a tiny pointer prompt. Worker reads brief, reads TODOs, completes them, ticks `[ ]` to `[x]`. |
+| **Verify-fix loop** | Phase 5 verify failures get **appended** to the same `TODOS.md` as new `[ ] FIX-N: ...` entries; host then sends a one-line "continue" to the same long-lived worker session. Up to 3 fix rounds. |
+| **Worker choice** | The skill asks the user at run start which worker to dispatch to (`claude` recommended, plus `codex` / `opencode` / `pi`). One worker per run, reused throughout. |
+| **Existing files** | All Claude Code-only artifacts (`hooks/`, `.claude-plugin/`, `commands/build.md`, `scripts/hook/`) remain in place. The new `package.json` + `openclaw-entry.mjs` + `openclaw.plugin.json` are the only repo-root additions; they coexist with the Claude Code manifest without conflict. |

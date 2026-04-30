@@ -184,8 +184,10 @@ Search all `.py` files in the project for `# --- VERIFY_ONLY_BEGIN ---` and `# -
 ### 4.2 Final Syntax Check
 
 ```bash
-find <project_path> -name "*.py" -exec python -m py_compile {} +
+find <project_path> -name "*.py" -exec uv run --project "<PROJECT_ROOT>" python -m py_compile {} +
 ```
+
+`<PROJECT_ROOT>` is the parent uv workspace (the directory holding `pyproject.toml`); `<project_path>` is the generator project directory under it. Using `uv run --project` ensures the syntax check runs against the same Python interpreter the project's uv env was set up with — bare `python` may pick up a different version and yield false positives.
 
 Confirm all files still compile after marker removal.
 
@@ -198,3 +200,21 @@ Report back to the calling command:
 - **Summary**: What was verified and how
 - **Issues found and fixed**: Any code fixes applied during verification
 - **Human interventions**: Any points where human action was required
+
+---
+
+## OpenClaw addendum — human-intervention bridge
+
+Under OpenClaw the verify-fix loop runs inside the long-lived coding-agent worker, not in this agent's own context. The worker has no direct user-facing channel — only the host orchestrator does. When `monitor.sh` exits with code 2, the worker MUST follow the bridge protocol below:
+
+1. Read `<PROJECT_ROOT>/.bridgic/verify/human_request.json` to obtain the prompt text.
+2. Write that prompt verbatim to `<PROJECT_ROOT>/.amphiloop/HUMAN_PROMPT.txt`.
+3. Print exactly this line to stdout: `### AMPHI-HUMAN-REQUEST ###`
+4. Poll `<PROJECT_ROOT>/.amphiloop/HUMAN_REPLY.txt` every 2 seconds. When it appears, read its contents.
+5. Write `{"response": "<reply text>"}` to `<PROJECT_ROOT>/.bridgic/verify/human_response.json`.
+6. Delete both `.amphiloop/HUMAN_REPLY.txt` and `.amphiloop/HUMAN_PROMPT.txt`.
+7. Re-invoke `monitor.sh` with the same arguments — it auto-resumes the still-running PID.
+
+Under Claude Code (when this agent runs as a subagent, not as worker code), the bridge is unnecessary — the agent uses its own tooling to ask the user and writes `human_response.json` directly.
+
+The bridge protocol is re-entrant: a single Phase 5 run may hit multiple HUMAN_REQUEST cycles (e.g. login then CAPTCHA). Same two filenames each time; the worker deletes them after consuming.

@@ -99,6 +99,8 @@ When you encounter a handoff during exploration, you **MUST** request human:
 - **Request** specific human intervention.
 - **Resume** exploration from the same point once the human confirms the obstacle is cleared.
 
+Each `HUMAN:` step in the Operation Sequence will map **one-to-one** to a `HumanCall` yield in the generated code (see `amphibious-code.md` Phase 2.3). The framework blocks at that yield until the user responds — you do not need to estimate how long the user will take, and you must **not** record a fallback `wait_for(time_seconds=...)` to "give the user time".
+
 Finally, record only the **minimal chain of operations** needed to achieve the goal. Exclude:
 
 - Observation commands (they happen on every step; they are not part of the plan).
@@ -128,7 +130,13 @@ After exploration, run the cleanup protocol recorded in the Domain Guidance to r
 
 ## Generate Report
 
-Write `exploration_report.md` plus all saved artifact files. The report has **up to three sections** — §1 is optional, §3 is omitted when no volatile data was captured.
+Write all outputs into `<PROJECT_ROOT>/.bridgic/explore/`:
+- `exploration_report.md` — the report itself
+- artifact files (e.g. `list_state.txt`, `detail_state.txt`) at the same directory level
+
+Do not nest under any further subdirectory. The path `<PROJECT_ROOT>/.bridgic/explore/` is the canonical location read by `amphibious-code.md` Phase 3 and `amphibious-verify.md`.
+
+The report has **up to three sections** — §1 is optional, §3 is omitted when no volatile data was captured.
 
 ### 1. Domain Guidance
 
@@ -206,3 +214,8 @@ A pseudocode-style list. Use indentation and control-flow keywords (`FOR`, `WHIL
 ### 3. Artifact Files
 
 List saved artifact paths. Each entry annotates **what extractable content** the file contains — enough for a reader to know which file documents which volatile data without opening every one.
+
+## Update build_context.md
+
+After writing the report and artifacts, edit `<PROJECT_ROOT>/.bridgic/build_context.md`:
+1. Replace the `## Outputs → exploration_report` placeholder line `exploration_report: (filled by Phase 3)` with the absolute path to `exploration_report.md` (e.g. `exploration_report: /abs/path/.bridgic/explore/exploration_report.md`).

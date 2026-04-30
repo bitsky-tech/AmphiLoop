@@ -13,6 +13,8 @@ tools: ["AskUserQuestion", "Bash", "Read", "Write"]
 
 # Amphibious Config Agent
 
+> **Not a dispatchable subagent.** This agent is interactive (uses `AskUserQuestion` / equivalent ask-the-user mechanism) and runs **inline** in the calling command's thread. Do not register it under `.claude-plugin/plugin.json` `agents:` — only `amphibious-explore`, `amphibious-code`, and `amphibious-verify` are dispatchable.
+
 You are a build-pipeline configuration specialist. Your job is to interactively determine project-mode / LLM / domain-specific settings, run environment setup, and write the consolidated `build_context.md` that every later agent reads.
 
 ## Input
@@ -33,7 +35,9 @@ This agent runs interactively from the very first step; there are no startup fil
 
 ## Step 1: Project Mode
 
-Present via `AskUserQuestion`:
+**Ask the user** with these exact options. Use the platform's structured-question tool if one is available (e.g. Claude Code's `AskUserQuestion`); otherwise send the question as a single message and wait for the user's reply. **Do not also emit the question as chat text alongside the tool call** — the question is sent once.
+
+Question:
 
 > Choose project mode:
 >
@@ -54,13 +58,13 @@ Decide whether to set up LLM — set `llm_configured` to `yes` or `no`.
   ```
 
   - Exit 0: variables present — proceed.
-  - Exit 1: list missing variables; create `.env`, ask the user to fill it, re-run the check; do not proceed until exit 0.
+  - Exit 1: use the same ask-the-user mechanism as Step 1. Tell the user the missing variables and ask whether to (a) write a `.env` skeleton for them to fill, or (b) wait while they `export` the vars in their shell. Then re-run `check-dotenv.sh` until exit 0; do not proceed until exit 0.
 
   Set `llm_configured = yes`.
 
 - **If `project_mode == workflow`**: analyze the task description.
 
-  - **If task contains AI-suggestive operations** (e.g. "extract key information", "analyze content", "generate a report"), ask via `AskUserQuestion`:
+  - **If task contains AI-suggestive operations** (e.g. "extract key information", "analyze content", "generate a report"), ask using the same mechanism as Step 1:
 
     > Your task description mentions operations that may benefit from AI/LLM capabilities (e.g. content analysis, intelligent extraction). Configure an LLM?
     >
@@ -74,7 +78,7 @@ Decide whether to set up LLM — set `llm_configured` to `yes` or `no`.
 
 ## Step 3: Domain-specific Configuration
 
-If `SELECTED_DOMAIN` is resolved AND `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/config.md` exists, read that file and follow its instructions verbatim — it tells you which questions to ask the user (still via `AskUserQuestion`) and which keys to record. Capture each answer as `domain_config[<key>] = <value>`.
+If `SELECTED_DOMAIN` is resolved AND `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/config.md` exists, read that file and follow its instructions verbatim — it tells you which questions to ask the user (using the same ask-the-user mechanism as Step 1) and which keys to record. Capture each answer as `domain_config[<key>] = <value>`.
 
 If no `config.md` exists, skip this step and treat `domain_config` as empty.
 

@@ -39,11 +39,6 @@ Anything else in `$ARGUMENTS` (extra tokens, multiple flags) → stop and ask th
 > **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
 > **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
 
-After Phases 3 and 4, refresh `build_context.md` in two places:
-
-1. **Outputs** — replace the matching `(filled by Phase N)` placeholder with the phase's primary output path.
-2. **env_ready** — read `{PROJECT_ROOT}/pyproject.toml` and update the dump under `--- pyproject.toml ---` inside the `env_ready:` block with its current contents.
-
 ---
 
 ## Phase 1: Initialize Task

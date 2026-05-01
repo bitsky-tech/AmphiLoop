@@ -25,3 +25,7 @@ __pycache__/
 
 # Node (if npx skills is used locally)
 node_modules/
+
+
+# superpowers
+docs/superpowers/

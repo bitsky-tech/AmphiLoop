@@ -1,0 +1,15 @@
+{
+  "id": "amphiloop",
+  "name": "AmphiLoop",
+  "description": "Drive AmphiLoop's 5-phase pipeline inside OpenClaw via /amphiloop_build; delegates every code-writing step to the built-in coding-agent skill via a TODO-protocol working directory.",
+  "version": "1.0.0",
+  "activation": {
+    "onStartup": false
+  },
+  "skills": ["./extensions/openclaw-skill"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

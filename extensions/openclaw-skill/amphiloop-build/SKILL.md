@@ -28,7 +28,7 @@ Turn a task description into a runnable bridgic-amphibious Python project.
 - **Inputs**:
   - `<taskSpec>`: free-form natural-language task description from the user
   - `<projectRoot>`: working directory the project will live under (ask the user; create it if it does not exist)
-- **Output**: `<projectRoot>/<project-name>/{amphi.py, main.py, log/, result/}`
+- **Output**: `<projectRoot>/<project-name>/{amphi.py, main.py, log/, result/, <support>.py …}` — every generated `.py` file lives **inside** `<project-name>/`. `<projectRoot>/` itself only carries uv metadata, `.bridgic/`, `.amphiloop/`, `.env`, `TASK.md`. See "Output layout — MANDATORY" inside the AGENT_BRIEF template (Step E0) for the full rule and anti-patterns.
 
 ## Path resolution
 
@@ -37,6 +37,27 @@ This skill ships **inside** the AmphiLoop repository at `<repo>/extensions/openc
 ## Mandatory flow
 
 Execute the steps in order. Never skip; never re-order. Throughout, **do not write or edit code yourself** — every code-touching action goes through `<workerSession>` (opened in Step E).
+
+### Human interaction & step checkpoints (★ read first ★)
+
+Every prompt to the user — including the gates between steps below and the in-step side-effect gates — MUST follow `{baseDir}/../../agents/human-interaction-protocol.md`. Inside OpenClaw the host is **Tier 2**: there is no `AskUserQuestion` here, only the chat / message channel captured in Step B (`notifyChannel` / `notifyTarget` / etc.), so every gate is a clearly formatted chat message that waits for the user's explicit textual reply.
+
+**Mandatory step-transition gates** (always send a 1–3 line summary + a "Continue?" question, wait for `yes` / `y` / `continue` before advancing):
+
+| Boundary | Why gate here |
+|---|---|
+| Step C → Step D | Config decisions are recorded; about to start probing the target environment (may open browsers, hit external sites, mutate user data). |
+| Step D → Step E0 | Exploration finished; about to spawn the long-lived `<worker>` session and burn LLM tokens for code generation. |
+| Step E → Step F | Code is frozen; about to run the generated program for the first time under `monitor.sh` (real side effects on the target environment, real API calls). |
+| Each fix attempt inside Step F | Before appending FIX-N and re-engaging the worker, give the user a chance to inspect the failure or stop the retry. |
+
+**Mandatory in-step gates** (single side-effect actions inside a step):
+
+- Step C → before `setup-env.sh` runs — surfaced by `amphibious-config.md` Step 4.0; honor it via Tier 2 since OpenClaw has no `AskUserQuestion`.
+- Step D → any `HUMAN:` handoff during exploration (login wall, CAPTCHA, etc.) — ask via Tier 2; never echo + poll.
+- Step F → on `monitor.sh` exit code 2 — relay the runtime prompt to the user via Tier 2 per the verify methodology's OpenClaw addendum.
+
+The user must always have the option to interrupt and redirect at every gate. Silence is **not** consent.
 
 ### Step A. Pick the coding worker (must ask the user)
 
@@ -61,9 +82,11 @@ This step does not write code; do it directly.
 ### Step C. Phase 2 — Config (host runs this directly)
 
 1. `read` the file `{baseDir}/../../agents/amphibious-config.md` to load the Phase 2 methodology.
-2. Following that methodology, read `<projectRoot>/TASK.md`, decide pipeline mode and any domain context, and `write` the result to `<projectRoot>/.bridgic/build_context.md`.
+2. Following that methodology, read `<projectRoot>/TASK.md`, decide pipeline mode and any domain context, and `write` the result to `<projectRoot>/.bridgic/build_context.md`. The methodology's questions (project mode, LLM, domain config) and its mid-step gate before `setup-env.sh` (Step 4.0) all use **Tier 2 chat messages** here — translate every "ask via `AskUserQuestion`" instruction into a clearly formatted chat question and wait for the user's explicit textual reply.
 
 This produces a markdown decision record, not code. Do it directly.
+
+**Step C → D gate** (before continuing): summarize the recorded decisions (mode, llm_configured, domain) in 1–3 lines and ask the user via chat: "Proceed to Phase 3 (Explore)? This phase will probe the target environment described in TASK.md — depending on the task it may open browsers, hit external sites, or read local files. Reply `yes` to continue, or describe what you want changed first."
 
 ### Step D. Phase 3 — Explore (host runs this directly)
 
@@ -72,7 +95,11 @@ This produces a markdown decision record, not code. Do it directly.
 
 Writing notes is not coding — do it directly.
 
+**HUMAN handoff during exploration** (login wall, CAPTCHA, manual confirmation, providing a token, etc.): the methodology in `amphibious-explore.md` already enumerates the three tiers and the anti-pattern; in this OpenClaw context you are running the methodology as the host, so the **Tier 2 case** applies — use the chat channel captured in Step B (`notifyChannel` / `notifyTarget`).
+
 **Exception**: if the exploration genuinely needs a probe script (Python / JS / shell) to be authored to make further observations possible, treat that probe-script authorship as the **first** code-writing action of the run and jump to Step E0/E now (use the probe-script as the first TODO).
+
+**Step D → E0 gate** (before continuing): summarize what exploration found — operation sequence sketch, any HUMAN steps in the plan, artifacts captured. Ask the user via chat: "Exploration complete (`<projectRoot>/.bridgic/exploration/exploration_report.md`). Proceed to Phase 4 (Code Generation)? This will spawn a long-lived `<worker>` session and burn LLM tokens to write the project. Reply `yes` to continue, or describe what you want adjusted in the plan first."
 
 ### Step E0. Prepare the work template (★ v8 ★ host writes the brief and TODO list before any coding)
 
@@ -115,13 +142,24 @@ Before opening any worker session, host must write two communication files into 
 
    The orchestrator may append new `[ ]` items to TODOS.md later (e.g. fixes after verification). When you receive a "continue" instruction, re-open TODOS.md, find the new open items, and resume from STEP 3.
 
-   ## Output layout
+   ## Output layout — MANDATORY
 
-   Final deliverable goes under `<projectRoot>/<project-name>/`:
-     amphi.py
-     main.py
-     log/
-     result/
+   Final deliverable lives **inside** `<projectRoot>/<project-name>/`. amphi.py / main.py / log/ / result/ and every support module MUST be inside `<project-name>/`. Dropping them at `<projectRoot>/` directly is a hard error — the orchestrator will reject the run.
+
+   `<projectRoot>/<project-name>/` layout:
+     amphi.py            ← entry, scaffold-created here
+     main.py             ← entry, you write here
+     log/                ← runtime logs
+     result/             ← task outputs
+     <support>.py        ← any extra helpers go here too, never at <projectRoot>
+
+   `<projectRoot>/` only carries uv metadata (`pyproject.toml`, `uv.lock`, `.venv/`, `.env`), the AmphiLoop workspace (`.bridgic/`, `.amphiloop/`), and `TASK.md`. Never write code into `<projectRoot>/.bridgic/` — that is the orchestrator's workspace.
+
+   Anti-patterns to avoid:
+   - ❌ `amphi.py` / `main.py` at `<projectRoot>/` (sibling of `pyproject.toml`)
+   - ❌ Treating `<project-name>/` as a Python import package (adding `__init__.py`, importing it from a sibling main.py at `<projectRoot>/`)
+   - ❌ `log/` or `result/` at `<projectRoot>/` instead of inside `<project-name>/`
+   - ❌ Any `.py` file written under `<projectRoot>/.bridgic/`
    ```
 
    When writing this file, substitute real absolute paths for `{baseDir}/../..` and `<projectRoot>` and `<domain>` (drop lines whose source files don't exist for the current run).
@@ -131,14 +169,16 @@ Before opening any worker session, host must write two communication files into 
    ```markdown
    # AmphiLoop build TODOs
 
-   - [ ] T1: Scaffold `<project-name>/` via the bridgic-amphibious CLI (per skills/bridgic-amphibious/SKILL.md). Create empty log/ and result/ dirs.
-   - [ ] T2: In amphi.py, define the CognitiveContext for this task following build_context.md.
-   - [ ] T3: In amphi.py, implement on_workflow yielding ActionCalls that mirror the Operation Sequence in exploration_report.md.
-   - [ ] T4: In amphi.py, implement on_agent think_units for AMPHIFLOW fallback per the methodology.
-   - [ ] T5: Register task tools (FunctionToolSpec) for any domain-specific operations the workflow needs.
-   - [ ] T6: Implement helper functions for parsing VOLATILE refs from ctx.observation.
-   - [ ] T7: Write main.py with LLM init (per skills/bridgic-llms/SKILL.md), tools assembly, and the agent.arun(...) call.
-   - [ ] T8: Run `uv run main.py` once dry to confirm it boots without import or syntax errors.
+   - [ ] T1: Scaffold inside `<project-name>/`. Run `mkdir -p <projectRoot>/<project-name> && cd <projectRoot>/<project-name> && uv run bridgic-amphibious create --task "<one-line task>"`. The `cd` is REQUIRED — running the CLI from `<projectRoot>` drops `amphi.py` at the wrong level. After it returns, verify `<projectRoot>/<project-name>/amphi.py` exists; if it landed at `<projectRoot>/amphi.py` instead, move it inside `<project-name>/` and fix.
+   - [ ] T2: Create empty `<projectRoot>/<project-name>/log/` and `<projectRoot>/<project-name>/result/` dirs (NOT at `<projectRoot>/log/` or `<projectRoot>/result/`).
+   - [ ] T3: In `<project-name>/amphi.py`, define the CognitiveContext for this task following build_context.md.
+   - [ ] T4: In `<project-name>/amphi.py`, implement on_workflow yielding ActionCalls that mirror the Operation Sequence in exploration_report.md.
+   - [ ] T5: In `<project-name>/amphi.py`, implement on_agent think_units for AMPHIFLOW fallback per the methodology.
+   - [ ] T6: Register task tools (FunctionToolSpec) for any domain-specific operations the workflow needs. Inline in `<project-name>/amphi.py` (or split into `<project-name>/tools.py` per the methodology — never at `<projectRoot>/`).
+   - [ ] T7: Implement helper functions for parsing VOLATILE refs from ctx.observation. Same placement rule — inside `<project-name>/`.
+   - [ ] T8: Write `<project-name>/main.py` with LLM init (per skills/bridgic-llms/SKILL.md), tools assembly, and the agent.arun(...) call.
+   - [ ] T9: Run `cd <projectRoot> && uv run python <project-name>/main.py` once dry to confirm it boots without import or syntax errors.
+   - [ ] T10: Final layout check — `ls <projectRoot>` should show `pyproject.toml`, `uv.lock`, `.venv/`, `.env`, `.bridgic/`, `.amphiloop/`, `TASK.md`, `<project-name>/` and NOTHING ELSE. Any `.py` file at `<projectRoot>/` is a violation.
    ```
 
 3. Send a short progress note to the user: "Worker brief and TODO list written to `<projectRoot>/.amphiloop/`. Opening coding-agent session next."
@@ -165,27 +205,38 @@ This is the first code-writing action of the run (unless Step D opened the sessi
 
 4. Monitor with `process action:log sessionId:<workerSession>` until the sentinel `### AMPHI-TASK-DONE ###` appears. Optionally `read` `<projectRoot>/.amphiloop/TODOS.md` periodically to watch `[x]` count rise.
 
-5. **Do NOT kill the session.** Continue to Step F.
+5. **Do NOT kill the session.**
+
+6. **Step E → F gate** (before continuing): summarize the worker's output — list the files now under `<projectRoot>/<project-name>/` (`amphi.py`, `main.py`, etc.), confirm `[x]` count on TODOS.md. Ask the user via chat: "Code generation complete. Proceed to Phase 5 (Verify)? This will run the generated program for the first time under `monitor.sh` — it will execute against the real target environment, may make real API calls, and may surface runtime `HumanCall` prompts you'll need to answer. Reply `yes` to continue, or `pause` to inspect the generated code first." Wait for the explicit affirmative reply, then continue to Step F.
 
 ### Step F. Phase 5 — Verify (host runs verify; bugs flow back via TODOS.md ★)
 
 1. `read` the file `{baseDir}/../../agents/amphibious-verify.md` to load the Phase 5 methodology.
 2. Run `{baseDir}/../../scripts/run/monitor.sh` against the generated project via `bash` (or follow whatever execution recipe the methodology prescribes for this run). Collect the output.
-3. Decide:
+
+   **If `monitor.sh` exits with code 2** (the running program hit a `HumanCall`), follow the verify methodology's **OpenClaw addendum** — host reads `<projectRoot>/.bridgic/verify/human_request.json`, relays the prompt to the user via Tier 2 chat, writes the user's reply into `human_response.json`, and re-invokes `monitor.sh`. **Never** invent a polling loop here; the protocol forbids it.
+
+3. Decide based on the exit:
    - **Pass** — proceed to Step G.
-   - **Fail, root cause is in the generated code** (logic error, missing import, wrong API call, etc.):
-     - Send a short progress note to the user ("Phase 5 verify failed; appending FIX TODOs (attempt N/3) and asking worker to continue").
-     - **Append** one or more FIX entries to `<projectRoot>/.amphiloop/TODOS.md` (use `read` then `write` the full new content; the worker is sentinel-waiting and not touching the file right now, so there is no write conflict). Format each entry as:
+   - **Fail, root cause is in the generated code** (logic error, missing import, wrong API call, etc.) — apply a **fix-attempt gate** before re-engaging the worker:
+     - Send the user via chat: `[CHECKPOINT]` Phase 5 verify failed (attempt N/3). One-line root cause: `<root cause>`. Proposed fix: `<expected fix>`. Reply `yes` to append FIX-N to TODOS.md and ask the worker to retry; reply `stop` to abort and inspect manually; or reply with edits to the proposed fix wording.
+     - Wait for the user's explicit reply.
+     - On `yes` (or an edited fix description): **append** one or more FIX entries to `<projectRoot>/.amphiloop/TODOS.md` (use `read` then `write` the full new content; the worker is sentinel-waiting and not touching the file right now, so there is no write conflict). Format each entry as:
        ```markdown
        - [ ] FIX-N: <relative-path>:<line> — <one-line root cause> — <expected fix>
          <optional 1–3 lines of relevant verify-log excerpt>
        ```
        Use a stable monotonic N across attempts (FIX-1, FIX-2, ...).
-     - Submit a one-line continue prompt to the **same** `<workerSession>` via `process action:submit sessionId:<workerSession> data:<prompt>`. The prompt is literally:
+     - Submit a one-line continue prompt to the **same** `<workerSession>` via `process action:submit sessionId:<workerSession> data:<prompt>`:
        > New FIX entries appended to `.amphiloop/TODOS.md`. Re-read TODOS.md and resume from the first open `[ ]` item. Same rules as before: tick each item to `[x]` as you finish, then print `### AMPHI-TASK-DONE ###` and wait. DO NOT exit.
      - Monitor with `process action:log` until the sentinel reappears.
      - Re-run verification (return to Step F.2).
-   - **Fail, root cause is NOT code** (missing env var, missing credential, network issue, missing input data) — fix it yourself with `bash` / `write`. Do not append a FIX TODO and do not submit to the worker. Re-run verification.
+     - On `stop` → proceed to Step G with `fail` status and the user-aborted reason.
+   - **Fail, root cause is NOT code** (missing env var, missing credential, network issue, missing input data):
+     - Send the user via chat: `[USER ACTION REQUIRED]` Phase 5 failed for a non-code reason: `<exact missing/broken thing>`. Reply with the missing value (e.g. an env var assignment), or `cancel` to stop the run.
+     - Apply the user's instructions yourself with `bash` / `write` (do not append a FIX TODO and do not submit to the worker).
+     - Re-run verification.
+
 4. Cap fix attempts at 3. After 3 consecutive code-fix attempts that still fail, stop the loop and proceed to Step G with a `fail` status.
 
 ### Step G. Cleanup and report

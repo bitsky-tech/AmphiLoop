@@ -37,7 +37,7 @@ Skill files (see Skill References below) and `## References` stay on-demand — 
 
 ## Output Layout
 
-The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating it if absent) and produces a code-only `<project-name>/` subdirectory. The structure inside `<PROJECT_ROOT>/` may follow the pattern below:
+The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating it if absent) and produces a code-only `<project-name>/` subdirectory. The structure inside `<PROJECT_ROOT>/` **MUST match this layout exactly** — deviations break Phase 5 verify and downstream orchestration:
 
 ```
 <PROJECT_ROOT>/
@@ -45,13 +45,25 @@ The agent installs its runtime dependencies into PROJECT_ROOT's uv env (creating
 ├── uv.lock             # resolution lockfile
 ├── .venv/              # uv-managed virtualenv
 ├── .env                # only when llm_configured = yes
-└── <project-name>/     # this agent's generator_project — code only
+├── .bridgic/           # orchestrator workspace (build_context.md, explore/, verify/) — DO NOT write code here
+└── <project-name>/     # this agent's generator_project — ALL generated code lives inside here
     ├── amphi.py        # scaffold-created; this agent edits it
     ├── main.py         # this agent creates: entry point (LLM init + agent.arun)
     ├── README.md       # short, operational
     ├── log/            # runtime logs land here (configured in main.py)
-    └── result/         # task outputs land here
+    ├── result/         # task outputs land here
+    └── <support>.py    # any extra helpers/modules go here too — never at PROJECT_ROOT
 ```
+
+**`<project-name>/` is the project's own directory, not a Python import package.** The entry points (`amphi.py`, `main.py`) and the support modules all live **inside** `<project-name>/`. PROJECT_ROOT only carries uv metadata (`pyproject.toml`, `uv.lock`, `.venv/`, `.env`) and the orchestrator's `.bridgic/` workspace — never code.
+
+### Layout anti-patterns — never produce these
+
+- ❌ `amphi.py` / `main.py` placed at `<PROJECT_ROOT>/` (sibling of `pyproject.toml`) instead of inside `<project-name>/`. The entry points must be reached as `<PROJECT_ROOT>/<project-name>/main.py`.
+- ❌ Treating `<project-name>/` as a Python import package (adding `__init__.py`, importing it from a sibling `main.py` at PROJECT_ROOT). `<project-name>/` is the project root, not a package alongside other code.
+- ❌ Writing project code (`*.py`, `log/`, `result/`) under `<PROJECT_ROOT>/.bridgic/`. That directory is the orchestrator's workspace and is exclusive to `build_context.md`, `explore/`, `verify/`.
+- ❌ Creating `log/` or `result/` at PROJECT_ROOT instead of inside `<project-name>/`. They must sit next to `main.py` so `Path(__file__).parent / "log"` resolves correctly.
+- ❌ Splitting support modules (`config.py`, `tools.py`, helper files) out to PROJECT_ROOT. Any module imported by `amphi.py` or `main.py` must live inside `<project-name>/`.
 
 ---
 
@@ -73,10 +85,14 @@ bash "{PLUGIN_ROOT}/skills/bridgic-amphibious/scripts/install-deps.sh" \
 
 ### 1.3 Scaffold `amphi.py`
 
+`cd` into `<project-name>/` **first**, then run the scaffolder. The cwd at the moment of `bridgic-amphibious create` is what determines where `amphi.py` lands — running it from `<PROJECT_ROOT>/` will drop the file at PROJECT_ROOT and violate the Output Layout.
+
 ```bash
 cd "<PROJECT_ROOT>/<project-name>"
 uv run bridgic-amphibious create --task "<one-line task description>"
 ```
+
+After the command returns, verify with `ls "<PROJECT_ROOT>/<project-name>/amphi.py"` — if `amphi.py` is missing or sitting at `<PROJECT_ROOT>/amphi.py` instead, stop and move it before continuing.
 
 ### 1.4 Create runtime directories
 

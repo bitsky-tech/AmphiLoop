@@ -13,6 +13,8 @@ tools: ["Bash", "Read", "Grep", "Glob", "Write", "Edit"]
 
 You are a verification specialist for bridgic-amphibious projects. Your job is to take an already-generated project, verify it runs correctly end-to-end, and return clean production code.
 
+Verify is the **last construction-phase step** — the orchestrator's first instrumented test-run of the freshly frozen code, before it is handed off to the user for production runs. Every user-facing prompt in this document (relaying a runtime `HumanCall`, surfacing a fatal error, deciding whether to retry) follows `{PLUGIN_ROOT}/agents/human-interaction-protocol.md`. The runtime file-bridge in Phase 1.2 is a *transport* that delivers prompts from the running program up to the orchestrator; once the prompt arrives here, this agent (or its OpenClaw-side host counterpart) is responsible for the Tier 1 / Tier 2 ask the protocol mandates.
+
 ## Input
 
 The calling command passes exactly two absolute paths:
@@ -151,7 +153,7 @@ bash {PLUGIN_ROOT}/scripts/run/monitor.sh {generator_project} [TIMEOUT]
 |------|---------|--------------|
 | **0** | Finished cleanly | Proceed to Phase 3 |
 | **1** | Finished with errors | Diagnose from stdout (last 50 log lines of `run.log`), fix code, re-run `monitor.sh` |
-| **2** | Human intervention required | Read the prompt from stdout, ask the user, write the answer to the `human_response` path printed in stdout as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
+| **2** | Human intervention required | Read the prompt from stdout, **ask the user via the Human Interaction Protocol** (Tier 1 `AskUserQuestion` if available; otherwise Tier 2 / escalate per the protocol — never silent polling), write the answer to the `human_response` path printed in stdout as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
 | **3** | Timeout | Report to user and investigate |
 
 The script calls `uv run python main.py`; the script returns only when an actionable event occurs. Re-invoke with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit. The script owns every runtime artifact (`run.log`, `pid`, `human_request.json`, `human_response.json`) and prints the resolved absolute paths to stdout on every exit, so that the agent can interact with them to reason next steps or communicate with the user.
@@ -203,18 +205,20 @@ Report back to the calling command:
 
 ---
 
-## OpenClaw addendum — human-intervention bridge
+## OpenClaw addendum — host-side human-intervention flow
 
-Under OpenClaw the verify-fix loop runs inside the long-lived coding-agent worker, not in this agent's own context. The worker has no direct user-facing channel — only the host orchestrator does. When `monitor.sh` exits with code 2, the worker MUST follow the bridge protocol below:
+Under OpenClaw, **the host orchestrator is the one running `monitor.sh`** (per `extensions/openclaw-skill/amphiloop-build/SKILL.md` Step F.2) and is therefore the natural Tier 2 endpoint per the Human Interaction Protocol. The host has a chat / message channel to the user; the worker (coding-agent) does not.
 
-1. Read `<PROJECT_ROOT>/.bridgic/verify/human_request.json` to obtain the prompt text.
-2. Write that prompt verbatim to `<PROJECT_ROOT>/.amphiloop/HUMAN_PROMPT.txt`.
-3. Print exactly this line to stdout: `### AMPHI-HUMAN-REQUEST ###`
-4. Poll `<PROJECT_ROOT>/.amphiloop/HUMAN_REPLY.txt` every 2 seconds. When it appears, read its contents.
-5. Write `{"response": "<reply text>"}` to `<PROJECT_ROOT>/.bridgic/verify/human_response.json`.
-6. Delete both `.amphiloop/HUMAN_REPLY.txt` and `.amphiloop/HUMAN_PROMPT.txt`.
-7. Re-invoke `monitor.sh` with the same arguments — it auto-resumes the still-running PID.
+When `monitor.sh` exits with code 2:
 
-Under Claude Code (when this agent runs as a subagent, not as worker code), the bridge is unnecessary — the agent uses its own tooling to ask the user and writes `human_response.json` directly.
+1. Host reads `<PROJECT_ROOT>/.bridgic/verify/human_request.json` to obtain the prompt text.
+2. Host asks the user via **Tier 2** (free-text chat message): begin with a `[USER ACTION REQUIRED]` marker, paste the prompt text, state how to reply (`reply with the answer text, or "done" once you've completed the action`).
+3. Host waits for the user's textual reply.
+4. Host writes `{"response": "<user reply>"}` to `<PROJECT_ROOT>/.bridgic/verify/human_response.json`.
+5. Host re-invokes `monitor.sh` with the same arguments — it auto-resumes the still-running PID.
 
-The bridge protocol is re-entrant: a single Phase 5 run may hit multiple HUMAN_REQUEST cycles (e.g. login then CAPTCHA). Same two filenames each time; the worker deletes them after consuming.
+This is re-entrant: a single Phase 5 run may hit multiple cycles (login, then CAPTCHA, then a confirmation dialog). Repeat the loop each time exit code 2 reappears.
+
+### Under Claude Code (no OpenClaw)
+
+When this agent runs as a Claude Code subagent (not as worker code), the OpenClaw addendum does not apply — the agent uses `AskUserQuestion` (or escalates per the protocol's Tier 3) and writes `human_response.json` directly.

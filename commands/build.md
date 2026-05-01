@@ -39,6 +39,21 @@ Anything else in `$ARGUMENTS` (extra tokens, multiple flags) → stop and ask th
 > **build_context_path** — always `{PROJECT_ROOT}/.bridgic/build_context.md`.
 > **domain_context_path** — `{PLUGIN_ROOT}/domain-context/<SELECTED_DOMAIN>/<phase>.md` when `SELECTED_DOMAIN` is resolved, otherwise the literal `none` (generic flow). `<phase>` is `explore.md` for Phase 3, `code.md` for Phase 4, `verify.md` for Phase 5.
 
+## Human Interaction & Phase Checkpoints
+
+Every prompt to the user — including the gates between phases below — MUST follow `{PLUGIN_ROOT}/agents/human-interaction-protocol.md`. Read it once before starting Phase 1. Inside Claude Code you are in **Tier 1**: use `AskUserQuestion` for every checkpoint and every decision the user must make.
+
+**Mandatory checkpoint between every phase transition** (Phase 1→2, 2→3, 3→4, 4→5):
+
+1. Send a 1–3 line summary of what just finished (artifacts written, decisions made).
+2. Name what the next phase is about to do, and call out side effects the user might want to veto: scripts that mutate the env (`setup-env.sh`), files about to be written (`.env`, `build_context.md`), real-environment probes, code generation, real runs of the generated program.
+3. Ask via `AskUserQuestion`: "Continue to Phase N?" with options like `1. Yes, continue` / `2. Pause — I want to adjust something`.
+4. Only advance on an explicit affirmative reply. On `2`, take whatever follow-up the user requests, then re-prompt the checkpoint.
+
+Do **not** chain phases automatically. The user must always have the option to interrupt at every boundary.
+
+Individual sub-steps inside a phase that have their own meaningful side effect (notably Phase 2 → `setup-env.sh`, which mutates the project's uv toolchain and writes `pyproject.toml`) follow the same rule — `amphibious-config.md` enumerates those mid-phase gates.
+
 ---
 
 ## Phase 1: Initialize Task

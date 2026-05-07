@@ -1,8 +1,13 @@
 # Browser Domain — Code Generation Context
 
+## Default route — CLI through the `bash` built-in
+
+`bridgic-browser` ships both a CLI and a Python SDK. Codegen should **default to the CLI driven through the framework's `bash` built-in tool**: every exploration step is already a `bridgic-browser <subcommand>` invocation, and `bash` lets `on_workflow` re-issue those commands verbatim — no SDK tool wiring, no `BrowserToolSetBuilder`. Escalate to the Python SDK only when the task genuinely needs Python-side control (parallel browser sessions, async coordination beyond a one-shot command, or a capability `bridgic-browser --help` does not expose). Escalate the **whole project** at once — do not mix `bash` CLI calls with a Python-launched `Browser(...)` in the same run, the two would be separate processes with diverging state.
+
 ## Domain reference files to read
 
-**MUST** read `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md` and `{PLUGIN_ROOT}/skills/bridgic-browser/references/cli-sdk-api-mapping.md` — SDK tool names and usage.
+- **CLI default:** `{PLUGIN_ROOT}/skills/bridgic-browser/SKILL.md` for the command list; `bridgic-browser <cmd> --help` for per-command flags.
+- **SDK escalation:** `{PLUGIN_ROOT}/skills/bridgic-browser/references/sdk-guide.md`, with `cli-sdk-api-mapping.md` as the CLI-name → SDK-method lookup when porting exploration steps.
 
 ## Faithful to exploration report
 
@@ -14,8 +19,23 @@
 
 ## Action conventions
 
-- `ActionCall` tool names must match SDK method names (not CLI command names). See `cli-sdk-api-mapping.md`.
-- **Explicit `wait_for` after every browser action.** Every state-mutating call is followed by `yield ActionCall("wait_for", time_seconds=<n>, description="...")`. Condition-based waits use `text=` / `text_gone=` / `selector=` (see `cli-sdk-api-mapping.md`). Recommended durations:
+- **Each browser action is a `bash` ActionCall on `bridgic-browser`.** The exploration step's CLI command goes through verbatim — refs and runtime values become flag values:
+
+  ```python
+  yield ActionCall("bash",
+                   description="Click Search",
+                   command=f"uv run bridgic-browser click_element_by_ref --ref {SEARCH_BUTTON_REF}")
+  ```
+
+- **Explicit `wait_for` after every state-mutating action** — itself a `bridgic-browser` subcommand:
+
+  ```python
+  yield ActionCall("bash",
+                   description="Wait for results to load",
+                   command="uv run bridgic-browser wait_for --time-seconds 3")
+  ```
+
+  Condition-based waits go through `--text` / `--text-gone` / `--selector` (see `bridgic-browser wait_for --help`). Recommended durations:
 
   | Action type | `time_seconds` |
   |---|---|
@@ -27,9 +47,11 @@
 
   Adjust to actual observed response times.
 
+- **Cleanup belongs in `main.py`'s `finally`,** not in `on_workflow`. One `uv run bridgic-browser close` after `arun()` returns or raises releases the persistent browser process even on partial failure.
+
 ## Observation management
 
-**Do NOT call `get_snapshot_text` inside `on_workflow` to read page state.** The `observation()` hook keeps `ctx.observation` up-to-date — read it directly. The only exception is when `on_workflow` needs a snapshot before hooks have run (e.g., the very first state check after navigation).
+The `observation()` hook keeps `ctx.observation` fresh for `on_workflow` and any agent-mode fallback. **Do not call `bridgic-browser snapshot` (or `tabs`) from inside `on_workflow`** — read `ctx.observation` directly. The only exception is when `on_workflow` needs a snapshot before any hook has run (e.g., the very first state check after navigation).
 
 ---
 
@@ -37,47 +59,63 @@
 
 ### Context (`CognitiveContext` subclass)
 
-Add a `browser` field — the SDK `Browser` instance — and mark it `json_schema_extra={"display": False}`. It is a non-serializable resource and must not be serialized into the LLM prompt.
+CLI route — no extra fields by default; the persistent browser process is owned by the CLI, not by Python:
 
 ```python
-from typing import Any
-from pydantic import Field
 from bridgic.amphibious import CognitiveContext
 
 class AmphiContext(CognitiveContext):
-    browser: Any = Field(default=None, json_schema_extra={"display": False})
+    pass
 ```
+
+(SDK escalation: add `browser: Any = Field(default=None, json_schema_extra={"display": False})` to hold the `Browser` instance — `display=False` keeps the non-serializable resource out of the LLM prompt.)
 
 ### Hooks — `observation` and `after_action`
 
-**`observation` — live browser state before each step.** Called automatically before each `yield` in `on_workflow` and each OTC cycle. Returns the current browser state (open tabs + page snapshot) for `ctx.observation`:
+**`observation` — live browser state before each step.** Called automatically before each `yield` in `on_workflow` and each OTC cycle. CLI route — fetch tabs + snapshot via `asyncio.create_subprocess_exec`:
 
 ```python
+import asyncio
+from typing import Optional
+
 async def observation(self, ctx) -> Optional[str]:
-    if ctx.browser is None:
-        return "No browser available."
+    async def cli(*args: str) -> str:
+        proc = await asyncio.create_subprocess_exec(
+            "uv", "run", "bridgic-browser", *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, _ = await proc.communicate()
+        return out.decode().strip()
 
     parts = []
-    tabs = await ctx.browser.get_tabs()
+    tabs = await cli("tabs")
     if tabs:
         parts.append(f"[Open tabs]\n{tabs}")
-    snapshot = await ctx.browser.get_snapshot_text(limit=1000000)
+    snapshot = await cli("snapshot")
     if snapshot:
         parts.append(f"[Snapshot]\n{snapshot}")
     return "\n\n".join(parts) if parts else "No page loaded."
 ```
 
-**`after_action` — mandatory override for observation refresh.** Called automatically after each tool call. Refreshes `ctx.observation` once `wait_for` completes. Critical for browser projects — without it, inline code between a `wait_for` yield and the next yield sees stale page state.
+(SDK escalation: replace the two `await cli(...)` calls with `await ctx.browser.get_tabs()` and `await ctx.browser.get_snapshot_text(limit=1000000)`.)
+
+**`after_action` — mandatory override for observation refresh.** Called after each tool call. Refreshes `ctx.observation` once `wait_for` completes; without it, inline code between a `wait_for` yield and the next yield sees stale page state. CLI route detects `wait_for` by looking at the `bash` step's command:
 
 ```python
 async def after_action(self, step_result, ctx):
     action_result = step_result.result
-    if hasattr(action_result, "results"):
-        for step in action_result.results:
-            if step.tool_name == "wait_for" and step.success:
-                ctx.observation = await self.observation(ctx)
-                break
+    if not hasattr(action_result, "results"):
+        return
+    for step in action_result.results:
+        if not step.success:
+            continue
+        if step.tool_name == "bash" and "wait_for" in (getattr(step, "args", None) or {}).get("command", ""):
+            ctx.observation = await self.observation(ctx)
+            break
 ```
+
+(SDK escalation: match on `step.tool_name == "wait_for"` directly, no command inspection needed.)
 
 ### Ref handling — STABLE vs VOLATILE
 
@@ -85,7 +123,7 @@ Browser refs are **deterministic per element**: the same DOM element on the same
 
 **Mirror that distinction directly in `amphi.py`:**
 
-- **STABLE refs → module-level constants.** For every ref tagged STABLE in the exploration report (header buttons, fixed dropdowns, pagination Next, search controls, etc.), declare a constant near the top of `amphi.py` and reference it inline at the yield site. **No `find_<name>_ref(observation)` parser** — the value is already known and re-deriving it by regex is pure waste.
+- **STABLE refs → module-level constants.** For every ref tagged STABLE in the exploration report (header buttons, fixed dropdowns, pagination Next, search controls, etc.), declare a constant near the top of `amphi.py` and interpolate it inline at the yield site. **No `find_<name>_ref(observation)` parser** — the value is already known and re-deriving it by regex is pure waste.
 
   ```python
   # Top of amphi.py — copy these from exploration_report.md §2 (STABLE-tagged steps).
@@ -94,9 +132,9 @@ Browser refs are **deterministic per element**: the same DOM element on the same
   NEXT_BUTTON_REF     = "cbac3327"
 
   # In on_workflow:
-  yield ActionCall("click_element_by_ref",
+  yield ActionCall("bash",
                    description="Open the status filter dropdown",
-                   ref=STATUS_DROPDOWN_REF)
+                   command=f"uv run bridgic-browser click_element_by_ref --ref {STATUS_DROPDOWN_REF}")
   ```
 
 - **VOLATILE refs → extracted per-iteration.** Per-row buttons, dynamically generated list items, and any element whose ref regenerates on each page load go in `ctx.observation` and must be parsed at runtime — see Helpers below.
@@ -127,13 +165,12 @@ Keep helpers as module-level functions in `amphi.py` (split into a sibling `help
 
 ---
 
-## `main.py` — browser lifecycle, run mode, LLM init, tool assembly
+## `main.py` — entry point + cleanup
 
-- **Browser lifecycle**: `async with Browser(...) as browser` — create in `main.py`, store in context.
-  - **Isolated mode**: set `user_data_dir` to `{PROJECT_ROOT}/.bridgic/browser/` (resolved at runtime as `Path(__file__).parent.parent / ".bridgic" / "browser"`). Matches the path used by Phase 3 exploration and Phase 5 verification, so the same isolated profile chain carries through every phase.
-  - **Default mode**: omit `user_data_dir` (use the browser's default profile).
-  - All other launch parameters (headless, channel, args, viewport, etc.) must mirror those recorded in the exploration report — otherwise, under Default mode the shared browser state observed during exploration may not be reachable at runtime.
-- **Browser tools**: `BrowserToolSetBuilder.for_tool_names(browser, ...)` selecting only the SDK methods used in the exploration.
+CLI route: no `async with Browser(...)`, no `BrowserToolSetBuilder`. The `bash` built-in is auto-injected, so `tools=` only carries any custom `TASK_TOOLS`. Cleanup goes in `finally` so the persistent browser process is released on either successful exit or unexpected raise.
+
+- **Launch parameters** (headless, channel, viewport, etc.) recorded in the exploration report attach to the **first** `bridgic-browser` action that boots the browser — propagate them as flags on that command (`--headless`, `--channel`, …; consult `bridgic-browser <cmd> --help`). Mismatches under Default mode break shared-state assumptions, just as they do for the SDK route.
+- **Isolated mode** (browser env mode = Isolated): pass `--user-data-dir` resolved as `Path(__file__).parent.parent / ".bridgic" / "browser"` on the first `bridgic-browser` action that boots the browser. **Default mode**: omit `--user-data-dir`.
 - **Goal**: hardcode the task description as a string in `main.py`. Multi-line descriptions go into a triple-quoted constant. Do not read it from a sibling file — the project should be runnable as-is from its own directory.
 
 Run-mode (`RunMode.WORKFLOW` / `RunMode.AMPHIFLOW`) and LLM initialization (`llm=llm` vs `llm=None`) follow the generic rules in `amphibious-code.md` — no browser-specific override.
@@ -142,12 +179,11 @@ Run-mode (`RunMode.WORKFLOW` / `RunMode.AMPHIFLOW`) and LLM initialization (`llm
 import asyncio
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 from dotenv import load_dotenv
 from bridgic.amphibious import RunMode
-from bridgic.browser.session import Browser
-from bridgic.browser.tools import BrowserToolSetBuilder
 
 # Only when llm_configured = yes:
 # from bridgic.llms.openai import OpenAILlm, OpenAIConfiguration
@@ -189,30 +225,20 @@ async def main():
     #     timeout=180.0,
     # )
 
-    # Launch parameters below mirror the exploration report's recorded values.
-    # Under Isolated mode also pass
-    # user_data_dir=Path(__file__).parent.parent / ".bridgic" / "browser"
-    # (i.e. {PROJECT_ROOT}/.bridgic/browser/).
-    async with Browser(headless=False) as browser:
-        builder = BrowserToolSetBuilder.for_tool_names(
-            browser,
-            "navigate_to",
-            # ...others based on exploration's Operation Sequence
-            strict=True,
-        )
-        browser_tools = builder.build()["tool_specs"]
-        all_tools = [*browser_tools, *TASK_TOOLS]
-
-        agent = Amphi(llm=llm, verbose=True)
-        # context carries `browser` (non-serializable) and `goal`; `tools` MUST
-        # go to arun() — context.tools is `CognitiveTools`, not a list.
+    agent = Amphi(llm=llm, verbose=True)
+    try:
         await agent.arun(
-            context=AmphiContext(browser=browser, goal=GOAL),
-            tools=all_tools,
+            context=AmphiContext(goal=GOAL),
+            tools=TASK_TOOLS,
             mode=RunMode.WORKFLOW,  # or RunMode.AMPHIFLOW
         )
+    finally:
+        # Release the persistent CLI browser process started during the run.
+        subprocess.run(["uv", "run", "bridgic-browser", "close"], check=False)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+For the SDK escalation, replace the `try / finally` block with `async with Browser(...) as browser:` (mirroring the launch parameters from the exploration report; under Isolated mode also pass `user_data_dir = Path(__file__).parent.parent / ".bridgic" / "browser"`), build browser tools via `BrowserToolSetBuilder.for_tool_names(browser, ...).build()["tool_specs"]`, hold the instance on `ctx.browser`, and pass `tools=[*browser_tools, *TASK_TOOLS]` to `arun()`.

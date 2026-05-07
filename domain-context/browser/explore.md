@@ -1,4 +1,4 @@
-# Browser Domain — Phase 3 Exploration Context
+# Browser Domain — Exploration Context
 
 ## Domain reference files to read
 

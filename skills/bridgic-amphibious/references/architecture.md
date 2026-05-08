@@ -2,12 +2,16 @@
 
 ## Table of Contents
 - [Four-Layer Architecture](#four-layer-architecture)
+- [Yield-Based Template Methods](#yield-based-template-methods)
+- [Three-Layer Dispatcher](#three-layer-dispatcher)
+- [Yield Primitives & Scope Rules](#yield-primitives--scope-rules)
 - [Observe-Think-Act (OTC) Cycle](#observe-think-act-otc-cycle)
 - [Execution Modes (RunMode)](#execution-modes-runmode)
 - [Data Exposure System](#data-exposure-system)
 - [Cognitive Policies](#cognitive-policies)
 - [Memory Architecture (CognitiveHistory)](#memory-architecture-cognitivehistory)
 - [Think Unit Descriptor Pattern](#think-unit-descriptor-pattern)
+- [WorkerRunner — External Runtime Path](#workerrunner--external-runtime-path)
 - [Phase Annotation (snapshot)](#phase-annotation-snapshot)
 - [Workflow Fallback Mechanism](#workflow-fallback-mechanism)
 - [Built-in Tools Subsystem](#built-in-tools-subsystem)
@@ -19,16 +23,18 @@
 
 ```
 Layer 4: AmphibiousAutoma (Orchestration)
-  ├─ on_agent()    → LLM-driven thinking
-  ├─ on_workflow() → Deterministic steps
-  └─ _run_once()   → Single OTC cycle
+  ├─ on_agent()    → async generator yielding ThinkCall / ActionCall / ...
+  ├─ on_workflow() → async generator yielding ActionCall / AgentCall / ...
+  └─ Three-layer dispatcher → drives the generator, routes each yield
 
-Layer 3: CognitiveWorker (Think Unit)
-  └─ thinking()    → LLM decision logic
+Layer 3: CognitiveWorker (Think Unit) — primary worker type
+  ├─ thinking()    → LLM decision logic
   └─ Policies      → acquiring, rehearsal, reflection
+   plus
+  WorkerRunner Protocol — escape hatch for external agent runtimes
 
 Layer 2: CognitiveContext (State Management)
-  ├─ goal, tools, skills, history
+  ├─ goal, tools, skills, cognitive_history, observation
   └─ Exposure system → data visibility control
 
 Layer 1: Exposure (Data Abstraction)
@@ -36,26 +42,93 @@ Layer 1: Exposure (Data Abstraction)
   └─ EntireExposure  → full exposure
 ```
 
+## Yield-Based Template Methods
+
+All template methods (`on_agent`, `on_workflow`, `observation`, `before_action`, `after_action`) are **async generators** that yield framework primitives. The dispatcher drives the generator with `__anext__` / `asend`, routes each yielded primitive to its handler, and feeds the handler's result back via `asend()`.
+
+```python
+async def on_workflow(self, ctx):
+    result_list = yield ActionCall("search", q="laptop")   # ← list[ToolResult] via asend()
+    text = yield LLMCall.chat(f"Summarize: {result_list[0].result}")
+    yield RETURN(text)                                     # ← captures and closes
+```
+
+PEP 525 forbids `return value` inside async generators (only bare `return` is allowed). The framework uses a yielded `RETURN(value)` primitive instead — the dispatcher captures `RETURN.value`, closes the generator, and uses the value as that flow's return.
+
+## Three-Layer Dispatcher
+
+The dispatcher is split into three methods, each with a single responsibility:
+
+```
+_dispatch_flow         (driver — body-mode policy)
+   ├─ Drives the generator with __anext__ / asend
+   ├─ Captures RETURN(value) and breaks the loop
+   ├─ On generator-internal exception with can_fallback=True:
+   │     escalate to on_agent via _invoke_template
+   └─ Catches _FullFallback raised by _dispatch_call to escalate
+                ↓ delegates each yielded item to ↓
+_dispatch_call         (per-Call handler — scope validation + per-Call fallback)
+   ├─ AgentCall   → must be scope='workflow';  recursively re-enter on_agent
+   ├─ ThinkCall   → must be scope='agent';     run the named CognitiveWorker / WorkerRunner
+   ├─ ActionCall  → run the tool; on failure escalate via _FullFallback if step threshold hit
+   ├─ HumanCall   → resolve channel and call handler
+   └─ LLMCall     → dispatch to chat / structure_output / tool_selector
+                ↑ used by ↑
+_invoke_template       (lightweight driver — for hooks, no fallback)
+   └─ Drives a hook generator with __anext__ / asend, no _FullFallback handling
+```
+
+| Concept | What lives here |
+|---------|-----------------|
+| `scope: "workflow" \| "agent" \| "hook"` | Threaded as a parameter through all three layers, used by `_dispatch_call` to validate `AgentCall` / `ThinkCall` |
+| `_FullFallback` | Internal sentinel exception. Raised by `_dispatch_call` to ask `_dispatch_flow` to escalate to `on_agent`. Not part of public API. |
+| `_FlowState` | Mutable per-flow state (max_consecutive_fallbacks, consecutive_failures, step_index, failed_steps). Created fresh per `_dispatch_flow` invocation; `None` when called from `_invoke_template` (hooks have no fallback bookkeeping). |
+| `can_fallback` | Bool, threaded along with `scope`. True only for `_amphiflow`'s on_workflow drive; False for pure WORKFLOW, hook drives, and AgentCall sub-drives. |
+
+`_agent`, `_workflow`, `_amphiflow` are the three GraphAutoma entry points. Each delegates to `_dispatch_flow` with the appropriate `scope` and `can_fallback` settings.
+
+## Yield Primitives & Scope Rules
+
+Six primitives, with strict scope rules enforced by `_dispatch_call`:
+
+| Primitive | `on_workflow` | `on_agent` | hooks | Result via `asend()` |
+|-----------|:-------------:|:----------:|:-----:|----------------------|
+| `ActionCall(name, **args)` | ✓ | ✓ | ✓ | `List[ToolResult]` |
+| `HumanCall(prompt=..., channel=...)` | ✓ | ✓ | ✓ | `str` (the response) |
+| `LLMCall.chat / .structure_output / .tool_selector(...)` | ✓ | ✓ | ✓ | `str` / typed instance / `(List[ToolCall], Optional[str])` |
+| `AgentCall(goal=..., history=..., tools=..., skills=...)` | ✓ | ✗ | ✗ | `None` |
+| `ThinkCall(name, ...)` | ✗ | ✓ | ✗ | typed instance (if `output_schema`) or `None` |
+| `RETURN(value)` | ✓ | ✓ | ✓ | (closes the generator; not asend-able) |
+
+A scope violation raises `RuntimeError` at dispatch time:
+
+- `AgentCall` outside `on_workflow`: `AgentCall represents the deterministic→autonomous transition; once you are inside on_agent, keep thinking via ThinkCall instead.`
+- `ThinkCall` outside `on_agent`: `ThinkCall is only valid inside on_agent (scope='agent')…`
+
+Why these rules: they encode role distinctions without restricting expressiveness inside each scope. `on_agent` is the LLM-driven flow — running another `on_agent` from inside it would just be more thinking, so use `ThinkCall`. `on_workflow` is the deterministic flow — `AgentCall` is the explicit "step out into autonomous reasoning for this sub-task" move. Hooks run between steps and have no business spawning sub-agents or reentering the cognitive runtime.
+
 ## Observe-Think-Act (OTC) Cycle
 
-Each think unit execution follows:
+Each `CognitiveWorker` execution (driven by `_run` / `_run_once`) follows:
 
-1. **Observe**: Gather current state
-   - Worker `observation(context)` called first
-   - If returns `_DELEGATE`, falls through to agent `observation(context)`
-   - Result stored in `context.observation`
+1. **Observe**: Gather current state.
+   - Worker `observation(ctx)` called first.
+   - If returns `_DELEGATE` (or `None` from a stub override), delegates to agent-level `observation(ctx)` via `_invoke_template`.
+   - Result stored in `ctx.observation`.
 
-2. **Think**: LLM decides next action
-   - `CognitiveWorker._thinking(context)` runs LLM
-   - Multi-round loop if cognitive policies fire
-   - Returns decision with `step_content`, `finish`, `output`
+2. **Think**: LLM decides next action.
+   - `CognitiveWorker._thinking(ctx)` runs the LLM.
+   - Multi-round loop if cognitive policies fire (acquiring, rehearsal, reflection).
+   - Returns decision with `step_content`, `finish`, `output`.
 
-3. **Act**: Execute tools or produce structured output
-   - `before_action()` hooks (worker → agent delegation)
-   - Route to `action_tool_call()` for tool calls
-   - Route to `action_custom_output()` for structured output (output_schema)
-   - `after_action()` hooks (worker → agent delegation)
-   - Record result in `CognitiveHistory`
+3. **Act**: Execute tools or produce structured output.
+   - `before_action()` hooks (worker → agent delegation, `_invoke_template`-driven).
+   - Route to `action_tool_call()` for tool calls.
+   - Route to `action_custom_output()` for structured output (`output_schema` set).
+   - `after_action()` hooks (worker → agent delegation).
+   - Record result in `CognitiveHistory`.
+
+The OTC cycle is the **CognitiveWorker** path. The alternative path — `WorkerRunner` — bypasses the cycle entirely (see below).
 
 ## Execution Modes (RunMode)
 
@@ -81,30 +154,30 @@ Controls how context data is visible to the LLM.
 
 All data visible at once. Used for tools.
 
-- Methods: `summary()` only
-- Implementation: `CognitiveTools`
+- Methods: `summary()` only.
+- Implementation: `CognitiveTools`.
 
 ### LayeredExposure[T]
 
 Progressive disclosure with details on demand.
 
-- Methods: `summary()` + `get_details(index)` + `reveal(index)`
-- Caching: `_revealed` dict stores cached details
-- Reset: `reset_revealed()` clears cache (at phase boundaries)
-- Implementations: `CognitiveSkills`, `CognitiveHistory`
+- Methods: `summary()` + `get_details(index)` + `reveal(index)`.
+- Caching: `_revealed` dict stores cached details.
+- Reset: `reset_revealed()` clears cache (at phase boundaries).
+- Implementations: `CognitiveSkills`, `CognitiveHistory`.
 
 ### Context Field Detection
 
 `Context` base class auto-detects `Exposure`-typed fields and classifies them as `layered` or `entire`. Custom fields that are plain types (str, dict, etc.) appear directly in the summary.
 
-- Hide a field from summary: `json_schema_extra={"display": False}`
-- Enable LLM propagation to an Exposure field: `json_schema_extra={"use_llm": True}`
+- Hide a field from summary: `json_schema_extra={"display": False}`.
+- Enable LLM propagation to an Exposure field: `json_schema_extra={"use_llm": True}`.
 
 ## Cognitive Policies
 
 Multi-round thinking within a single OTC cycle. Each policy fires **at most once**, then closes.
 
-### Acquiring (built-in, always active when no output_schema)
+### Acquiring (built-in, always active when no `output_schema`)
 
 LLM requests details from `LayeredExposure` fields (skills, cognitive_history).
 
@@ -165,26 +238,57 @@ Default parameters:
 
 Think units use Python descriptors for class-level declaration:
 
-1. `think_unit()` factory returns `ThinkUnitDescriptor`
-2. On instance access (`self.main_think`), returns `_BoundThinkUnit`
-3. `_BoundThinkUnit` is awaitable (`await self.main_think`)
-4. Supports `.until()` for conditional loops
-5. Fresh worker clone per execution (state isolation)
+1. `think_unit(...)` factory returns a `ThinkUnitDescriptor`.
+2. Both class- and instance-level access (`MyAgent.main_think`, `self.main_think`) return the descriptor itself — invocation goes through `yield ThinkCall("name")`.
+3. The dispatcher resolves the name via `getattr(type(self), name)`, picks up the descriptor, and:
+   - For a `CognitiveWorker` template: clones the worker for state isolation, injects the agent's LLM at runtime, and runs the OTC cycle through `_run`.
+   - For a `WorkerRunner` template: uses the template directly (the runner manages its own state) and calls `run(agent, ctx)` once.
+4. Overlay parameters from `think_unit(...)` (descriptor defaults) and from `ThinkCall(name, ...)` (per-yield overrides) merge: `None` on the ThinkCall keeps the descriptor's value, anything else overrides.
+
+## WorkerRunner — External Runtime Path
+
+`CognitiveWorker` decomposes execution into the explicit observe-think-act cycle the framework drives. That's convenient when you want the framework to manage iteration, tool selection, and trace recording — and rigid when the goal is to plug in an *external* agent runtime that already has its own internal loop.
+
+`WorkerRunner` is the minimal alternative — a `@runtime_checkable` Protocol with a single method:
+
+```python
+@runtime_checkable
+class WorkerRunner(Protocol):
+    async def run(self, agent: AmphibiousAutoma, ctx: CognitiveContext) -> None: ...
+```
+
+The dispatcher checks `isinstance(worker, CognitiveWorker)` first; if False but `isinstance(worker, WorkerRunner)`, it calls `run(agent, ctx)` directly and skips the OTC cycle.
+
+```
+ThinkCall("name") yielded
+    │
+    v
+_dispatch_call resolves descriptor and worker template
+    │
+    ├── CognitiveWorker?         → clone + inject LLM + drive OTC cycle through _run
+    │
+    └── WorkerRunner (Protocol)? → call run(agent, ctx) once; runner owns its loop
+```
+
+**Tradeoffs.** On the WorkerRunner path, the `until` / `max_attempts` / `tools` / `skills` overlays are ignored — the runner manages its own iteration and tool exposure. The runner is expected to write its transcript into `ctx.cognitive_history` directly so the framework's history surface remains consistent.
+
+`CognitiveWorker` does **not** itself satisfy `WorkerRunner` — the two paths are kept distinct so the dispatcher's `isinstance` check is unambiguous.
 
 ## Phase Annotation (snapshot)
 
-`self.snapshot()` creates scoped context overrides:
+`self.snapshot(...)` is an async context manager that creates scoped context overrides:
 
 ```python
 async with self.snapshot(goal="Sub-task A"):
-    # Original fields saved, overrides applied
-    # LayeredExposure._revealed cleared
-    await self.worker  # LLM sees goal = "Sub-task A"
-# Original fields + revealed state restored
+    # Original fields saved, overrides applied.
+    # LayeredExposure._revealed cleared.
+    yield ThinkCall("worker")  # LLM sees goal = "Sub-task A"
+# Original fields + revealed state restored.
 ```
 
-- Provides sub-goal scoping for focused thinking
-- Exception-safe via async context manager
+- Provides sub-goal scoping for focused thinking.
+- Exception-safe via async context manager.
+- Used internally by `AgentCall` to scope the sub-agent's context.
 
 ## Workflow Fallback Mechanism
 
@@ -192,16 +296,16 @@ Two distinct failure sources are handled in AMPHIFLOW mode:
 
 **ActionCall tool failure** (a yielded tool raises during execution):
 
-1. Step fails → check `consecutive_failures < max_consecutive_fallbacks`
-2. Within limit: agent fixes the specific step (scoped goal via `snapshot`); generator resumes
-3. Limit exceeded: abandon workflow → call `on_agent()` for full agent mode
+1. Step fails → `_dispatch_call` increments `state.consecutive_failures`.
+2. Within `state.max_consecutive_fallbacks`: `_dispatch_call` constructs a scoped `snapshot(goal=fallback_goal)` and runs the fallback worker for `WORKFLOW_STEP_FALLBACK_MAX_ATTEMPTS`; the generator resumes via `asend()` afterward.
+3. Threshold exceeded: raise `_FullFallback`, which `_dispatch_flow` catches → invoke `on_agent(ctx)` for full agent mode and return.
 
 **Generator-internal exception** (helper / inline logic between yields raises):
 
-- The generator is unrecoverable after a raise — `asend()` cannot resume it — so step-level fallback is impossible. The framework jumps directly to full fallback: `on_agent(ctx)` takes over the remaining task.
-- Pure WORKFLOW mode (`will_fallback=False`): the original exception is re-raised — no fallback.
-- AMPHIFLOW with `on_agent` overridden: hand off to `on_agent(ctx)`.
-- AMPHIFLOW forced via `mode=` without an `on_agent` override: a `RuntimeError` is raised, tagged with the failing step index.
+- The generator is unrecoverable after a raise — `asend()` cannot resume it — so step-level fallback is impossible. `_dispatch_flow` catches the exception directly and:
+  - Pure WORKFLOW mode (`can_fallback=False`): re-raises the original exception.
+  - AMPHIFLOW with `on_agent` overridden: hands off to `_invoke_template(self.on_agent(ctx), …, scope="agent")`.
+  - AMPHIFLOW forced via `mode=` without an `on_agent` override: raises a `RuntimeError` tagged with the failing step index.
 
 `AgentCall` yield is orthogonal to fallback — it explicitly delegates a sub-task to agent mode (with a clean context snapshot) regardless of failure state.
 
@@ -227,7 +331,7 @@ The filesystem-mutating built-ins (`write_file`, `edit_file`) require a prior `r
 - `read_file` records the file's mtime after a successful read (best-effort: a failed `os.stat` here is silently swallowed so it cannot mask the successful read).
 - `write_file` (for existing files) and `edit_file` consult the tracker and raise `RuntimeError` if (a) the path was never read, or (b) the current mtime is newer than the recorded one.
 
-The tools resolve the agent through the same `current_agent` ContextVar used by `request_human`, so the tracker is implicitly per-`asyncio.Task`: concurrent `arun()` calls from separate agents never share state.
+The tools resolve the agent through the `current_agent` ContextVar, so the tracker is implicitly per-`asyncio.Task`: concurrent `arun()` calls from separate agents never share state.
 
 ### Tool exception path
 
@@ -241,16 +345,37 @@ In agent mode this becomes part of the next observation, letting the LLM see wha
 
 ## Human-in-the-Loop
 
-Three entry points for requesting human input, all built on `request_feedback_async`:
+Three entry points all converge on `AmphibiousAutoma._dispatch_human_channel(prompt, channel=None)`:
 
 | Entry Point | Context | Mechanism |
 |-------------|---------|-----------|
-| `await self.request_human(prompt)` | `on_agent()` — between think units | Direct async call |
-| `yield HumanCall(prompt=...)` | `on_workflow()` — pause generator | Framework calls `request_human`, sends response via `asend()` |
-| `request_human` tool (auto-injected) | LLM-driven — any mode | Built-in tool injected into `context.tools` during `arun()`, resolved via `ContextVar` |
+| `yield HumanCall(prompt=..., channel=...)` | Any flow (`on_agent`, `on_workflow`, hooks) | `_dispatch_call` routes the yield through `_dispatch_human_channel` |
+| `request_human` tool (auto-injected) | LLM-driven — any mode | Built-in tool injected into `context.tools` during `arun()`, resolved via `current_agent` ContextVar; calls `_dispatch_human_channel` |
 
-**Customization**: Override `human_input(data)` template method to replace default stdin with your UI (WebSocket, HTTP callback, Slack bot, etc.).
+### Channel registration via `@human_channel`
 
-**Auto-injection**: `request_human` is one of the seven tools injected by `arun()` (see [Built-in Tools Subsystem](#built-in-tools-subsystem) above). Auto-injection is what gives `on_agent`, workflow step-level fallback, and full agent fallback the same autonomous HITL capability as `HumanCall` provides to `on_workflow`. Users can still pass `request_human_tool` explicitly — it is a no-op thanks to the dedupe.
+```python
+@human_channel              # bare → channel name = method name
+async def terminal(self, prompt: str) -> str: ...
 
-**Concurrency**: `request_human` uses `contextvars.ContextVar` for late-binding. Each `asyncio.Task` (each `arun()`) gets its own isolated binding — concurrent agents sharing the same tool object never interfere.
+@human_channel("feishu")    # explicit channel name
+async def ask_feishu(self, prompt: str) -> str: ...
+```
+
+The `@human_channel` decorator tags a method with `_human_channel_name`. When the subclass is created, `AmphibiousAutoma.__init_subclass__` walks the MRO (via `_build_human_channel_registry`), collects every tagged method, and populates `cls._human_channels: Dict[str, str]` (channel-name → method-name). Subclass registrations win over parent declarations.
+
+Channel handlers are **plain async methods returning `str`**, not async generators — they are leaf I/O operations.
+
+### Channel resolution (at dispatch time)
+
+| Registry size | `channel=None` behaviour | `channel="name"` behaviour |
+|---------------|--------------------------|----------------------------|
+| 0 | Falls through to `_stdin_human_fallback` (reads from stdin via `run_in_executor`) | Raises `RuntimeError("Unknown human channel: ...")` |
+| 1 | Implicit default — that channel is used | Looked up in registry; raises if name not present |
+| 2+ | Raises `RuntimeError("HumanCall(channel=None) is ambiguous: N channels registered…")` | Looked up in registry; raises if name not present |
+
+The LLM-facing `request_human` tool always passes `channel=None`, so when multiple channels are registered the agent must keep at least one of them as the unambiguous default — otherwise `request_human` will raise at call time.
+
+### Concurrency
+
+`request_human` uses `contextvars.ContextVar` (`current_agent`) for late-binding. Each `asyncio.Task` (each `arun()`) gets its own isolated binding — concurrent agents sharing the same tool object never interfere.

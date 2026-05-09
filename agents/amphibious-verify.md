@@ -99,7 +99,7 @@ result = await agent.arun(
 - If `arun()` already has a `mode=` parameter set to anything other than `RunMode.WORKFLOW`, wrap **that line** with the markers and replace its value.
 - If `arun()` is on a single line (e.g. `await agent.arun(goal=GOAL, tools=TASK_TOOLS)`), first reformat it to multi-line so each argument is on its own line; the markers then attach cleanly to the new `mode=` line.
 
-### 1.2 Human-input signal-file override
+### 1.2 Human-input channel override
 
 **Precondition**:
 
@@ -109,15 +109,27 @@ grep -rnE "\byield\s+HumanCall\b" {generator_project}/
 
 The grep targets actual `yield HumanCall(...)` sites — not bare `from bridgic.amphibious import HumanCall` lines that may import the symbol without using it. No match → no human-interaction points → skip 1.2.
 
-Insert a `human_input` method override into the agent class (in `amphi.py`). It replaces the default stdin-based input with a file-based channel `monitor.sh` drives.
+Register a verify-only `@human_channel`-decorated method on the agent class. It swaps the runtime handler to a file-based one driven by `monitor.sh` **without touching the existing human-input design** in the generated code.
 
-**Where to insert**: as a method of the `AmphibiousAutoma` subclass, right after the class definition line.
+**Where to insert**: a method on the `AmphibiousAutoma` subclass — placed **after** any existing `@human_channel`-decorated method in `amphi.py` so class-body evaluation order makes the verify handler win.
 
-**Implementation pattern** (imports stay inside the method body so Phase 4's marker removal does not leave orphan top-level imports):
+**Channel name**:
+- If `amphi.py` declares no `@human_channel`, decorate the verify method as `@human_channel("verify")` — it becomes the only channel and the implicit default.
+- If `amphi.py` already declares `@human_channel("X")`, decorate the verify method with the **same** name (`@human_channel("X")`) so production `yield HumanCall(prompt=...)` sites resolve to the verify handler with no edits at the call sites.
+
+**Implementation pattern** (the module-level `human_channel` import goes in its own marker block so Phase 4 strips the import alongside the decorated method):
 
 ```python
+# --- VERIFY_ONLY_BEGIN ---
+from bridgic.amphibious import human_channel
+# --- VERIFY_ONLY_END ---
+
+class Amphi(AmphibiousAutoma[AmphiContext]):
+    # ... existing class body ...
+
     # --- VERIFY_ONLY_BEGIN ---
-    async def human_input(self, data):
+    @human_channel("verify")  # or the existing channel name (see "Channel name" above)
+    async def verify_human_input(self, prompt: str) -> str:
         """Signal-file human input for verification mode."""
         import json, asyncio
         from pathlib import Path
@@ -126,7 +138,6 @@ Insert a `human_input` method override into the agent class (in `amphi.py`). It 
         # project. Stays consistent with monitor.sh.
         verify_dir = Path(__file__).resolve().parent.parent / ".bridgic" / "verify"
         verify_dir.mkdir(parents=True, exist_ok=True)
-        prompt = data.get("prompt", "Human input required:")
         request_file = verify_dir / "human_request.json"
         request_file.write_text(json.dumps({"prompt": prompt}))
         print(f"[HUMAN_ACTION_REQUIRED] {prompt}", flush=True)
@@ -139,6 +150,8 @@ Insert a `human_input` method override into the agent class (in `amphi.py`). It 
         return response.get("response", "")
     # --- VERIFY_ONLY_END ---
 ```
+
+Channel handlers are **plain async methods returning `str`** — they receive `prompt` as a positional argument (no `data` dict, no generator yields).
 
 ### 1.3 Bound dynamic iteration
 

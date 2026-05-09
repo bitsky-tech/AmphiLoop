@@ -224,7 +224,7 @@ Inline in `amphi.py` by default. Split into a sibling `tools.py` only when there
 
 ### 2.5 `on_workflow`
 
-An async generator that yields `ActionCall` / `AgentCall` / `HumanCall`. Translate the exploration report's "Operation Sequence" into yields, preserving order, parameters, and stability annotations.
+An async generator that yields framework primitives — `ActionCall`, `AgentCall`, `HumanCall`, `LLMCall`, `RETURN`. Translate the exploration report's "Operation Sequence" into yields, preserving order, parameters, and stability annotations.
 
 1. **Every `ActionCall` includes `description="..."`.** The description is debug-log text *and* — critically — the only context the agent receives if the step fails and triggers fallback. Without it, the fallback agent has no idea what the failed step was trying to do.
 
@@ -243,15 +243,18 @@ An async generator that yields `ActionCall` / `AgentCall` / `HumanCall`. Transla
    yield ActionCall("click_element_by_ref", description="Click Search", ref=SEARCH_BUTTON_REF)
    ```
 
-4. **Three yield types, distinct semantics. Prefer `ActionCall`.**
+4. **Pick the right yield primitive — prefer `ActionCall`.**
 
    ```python
-   yield ActionCall("save_record", description="Persist row to DB", **row)            # Deterministic
-   yield AgentCall(goal="Categorize the record", tools=["tag_record"], max_attempts=3)  # Semantic sub-task
-   yield HumanCall(prompt="Confirm before deleting?")                                   # Human-only
+   yield ActionCall("save_record", description="Persist row to DB", **row)              # Deterministic tool call
+   yield AgentCall(goal="Categorize the record", tools=["tag_record"], max_attempts=3)  # Sub-agent (LLM)
+   yield HumanCall(prompt="Confirm before deleting?")                                   # Human input — implicit default channel
+   yield HumanCall(prompt="Approve trade?", channel="feishu")                            # Route to a specific @human_channel (see §2.8)
+   summary = yield LLMCall.chat("Summarise these results: ...")                         # One-shot LLM call
+   yield RETURN(summary)                                                                # Final answer
    ```
 
-   `AgentCall` is for genuinely semantic sub-tasks (analyse, categorise, summarise). `HumanCall` is the workflow-mode entry for any human-in-the-loop interaction.
+   `AgentCall` re-enters `on_agent` with a snapshotted context — for genuinely semantic sub-tasks (analyse, categorise, summarise). `HumanCall` pauses for human input via the `@human_channel` registry (§2.8). `LLMCall` does one direct LLM call — `.chat` returns `str`, `.structure_output(schema=...)` returns a Pydantic instance, `.tool_selector(...)` returns tool calls. `RETURN(value)` replaces `return value` (forbidden in async generators); yielded at top level it sets `agent.final_answer`.
 
 5. **Built-in tools** — `bash`, `read_file`, `write_file`, `edit_file`, `glob`, `grep` are auto-injected; yield them by name to run a CLI, touch the filesystem, or search content. `write_file` / `edit_file` require a prior `read_file` on the same path within the run.
 
@@ -265,10 +268,10 @@ An async generator that yields `ActionCall` / `AgentCall` / `HumanCall`. Transla
 
 ### 2.6 `on_agent`
 
-Declare `think_unit`s as class attributes; await them in `on_agent`. Each `think_unit` wraps a `CognitiveWorker` running an OTC loop until completion or `max_attempts` exhausts.
+Declare `think_unit`s as class attributes; invoke them via `yield ThinkCall("name")`. Each `think_unit` wraps a `CognitiveWorker` running an OTC loop until completion or `max_attempts` exhausts.
 
 ```python
-from bridgic.amphibious import CognitiveWorker, think_unit
+from bridgic.amphibious import CognitiveWorker, think_unit, ThinkCall
 
 class Amphi(AmphibiousAutoma[AmphiContext]):
     fixer = think_unit(
@@ -277,24 +280,72 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
     )
 
     async def on_agent(self, ctx):
-        await self.fixer
+        yield ThinkCall("fixer")
 ```
 
-- **One `think_unit` = one cohesive sub-task.** Multi-phase work splits into multiple think_units chained in `on_agent`; use `async with self.snapshot(goal=...)` per phase if a scoped goal helps the LLM.
+- **`on_agent` is an async generator** — Allowed primitives: `ThinkCall`, `ActionCall`, `HumanCall`, `LLMCall`, `RETURN`. `AgentCall` is **not** allowed in `on_agent` (use it only from `on_workflow`); `ThinkCall` is **only** allowed in `on_agent`. Scope violations raise `RuntimeError` at dispatch.
+- **One `think_unit` = one cohesive sub-task.** Multi-phase work splits into multiple think_units chained via successive `yield ThinkCall(...)`; use `async with self.snapshot(goal=...)` per phase if a scoped goal helps the LLM.
 - **`max_attempts` budget**: 3–5 for narrow recovery tasks, up to 10 for open-ended exploration. Higher budgets only help if the worker actually converges.
+- **Conditional looping** — pass `until=...` (with optional `max_attempts=...`, `tools=[...]`) as a `ThinkCall` overlay: `yield ThinkCall("researcher", until=lambda ctx: len(ctx.cognitive_history) >= 3, max_attempts=50)`.
 - **Restrict the toolset per phase** with `think_unit(tools=[...])` (filter accepts both built-in and custom names) when a phase should be defensive — e.g. an audit-only think_unit that excludes `bash`, `write_file`, `edit_file`. The class attribute `builtin_tools = frozenset({...})` is the project-wide equivalent.
 
 ### 2.7 Hooks
 
-Override only the hooks the task actually needs — don't stub out empty methods.
+Override only the hooks the task actually needs — don't stub out empty methods. Hooks accept either a plain `async def` coroutine or an `async def` with `yield`s (async generator). Allowed primitives in hook scope: `ActionCall`, `HumanCall`, `LLMCall`, `RETURN` (`AgentCall` and `ThinkCall` are not).
 
 | Hook | When called | Use for |
 |------|-------------|---------|
-| `observation(self, ctx)` | Before each OTC cycle and each `yield` in workflow | Fetch live state (page snapshot, DB row, GET /status). Return value populates `ctx.observation`. |
-| `before_action(self, decision_result, ctx)` | Before each tool execution | Sanitize LLM-formatted args, gate dangerous calls, mark items as in-flight. |
-| `after_action(self, step_result, ctx)` | After each tool execution | Refresh `ctx.observation` after a state-changing action, accumulate results, run cleanup. |
+| `observation(self, ctx)` | Before each OTC cycle and each `yield` in workflow | Fetch live state. Yield `ActionCall(...)` to call a tool from inside the hook, then `yield RETURN(value)` to set `ctx.observation`. |
+| `before_action(self, decision_result, ctx)` | Before each tool execution | Sanitize LLM-formatted args, gate dangerous calls. `yield RETURN(filtered)` overrides `decision_result`. |
+| `after_action(self, step_result, ctx)` | After each tool execution | Plain coroutine — accumulate results, refresh side state, run cleanup. No `yield` needed. |
+| `action_custom_output(self, decision_result, ctx)` | After a typed-output `think_unit` produces a Pydantic value | Plain coroutine — post-process / redact / persist; return the (possibly mutated) value. |
 
-Domain-specific hook patterns (e.g. browser's `after_action` refreshing observation on `wait_for` completion) come from the domain-context file.
+```python
+async def observation(self, ctx):
+    result = yield ActionCall("bash", description="Get live state", command="my-tool snapshot")
+    yield RETURN(result[0].result if result else "no state")
+```
+
+Domain-specific hook patterns (e.g. browser's `observation` calling `bridgic-browser snapshot`) come from the domain-context file.
+
+### 2.8 Human-in-the-loop channels (`@human_channel`)
+
+Skip this section unless the task has any human-input touchpoint (a `yield HumanCall(...)`, the auto-injected `request_human` tool, or both). When it does, register the input handler as a class method decorated with `@human_channel`.
+
+```python
+from bridgic.amphibious import human_channel
+
+class Amphi(AmphibiousAutoma[AmphiContext]):
+    @human_channel              # bare → channel name = method name ("terminal")
+    async def terminal(self, prompt: str) -> str:
+        return input(f"\n> {prompt}\n")
+
+    # Or with an explicit channel name when you want decoupling from the method:
+    # @human_channel("websocket")
+    # async def ws_handler(self, prompt: str) -> str: ...
+```
+
+- **Zero handlers registered** → `HumanCall` falls through to the framework's stdin handler. Acceptable for CLI tasks where the user is literally at a terminal; otherwise register one.
+- **One handler registered** → it's the implicit default. `yield HumanCall(prompt=...)` (no `channel=`) routes to it.
+- **Multiple handlers registered** → `HumanCall(channel="name")` must be explicit, or dispatch raises `RuntimeError`. The auto-injected `request_human` tool routes through the same registry.
+- Handlers are **plain async methods returning `str`**, not generators (they are leaf I/O operations).
+
+`HumanCall`'s signature is `HumanCall(prompt: str = "", channel: Optional[str] = None)` — `channel` is a **keyword argument** (the first positional slot is `prompt`). Pick the channel by name:
+
+```python
+class Amphi(AmphibiousAutoma[AmphiContext]):
+    @human_channel("feishu")
+    async def feishu(self, prompt: str) -> str:
+        return await feishu_client.send_and_wait(prompt)
+
+    @human_channel("email")
+    async def email(self, prompt: str) -> str:
+        return await email_client.send_and_wait(prompt)
+
+    async def on_workflow(self, ctx):
+        decision = yield HumanCall(prompt="Approve the trade?", channel="feishu")
+        yield HumanCall(prompt="Trade settled — close-of-day notice", channel="email")
+```
 
 ---
 

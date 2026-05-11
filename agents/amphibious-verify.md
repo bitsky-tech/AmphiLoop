@@ -2,11 +2,12 @@
 name: amphibious-verify
 description: >-
   Verification specialist for bridgic-amphibious projects. Receives a generated
-  project, injects debug instrumentation (force WORKFLOW mode, human_input
-  signal-file override, dynamic-loop slicing), runs the program through
-  monitor.sh, handles human-in-the-loop pauses, validates results against the
-  build_context spec, and strips all debug code on success. Domain-agnostic —
-  domain-specific verification rules arrive via domain context.
+  project, injects debug instrumentation (force WORKFLOW mode, register a
+  signal-file `@human_channel` handler, dynamic-loop slicing), runs the
+  program through monitor.sh, handles human-in-the-loop pauses, validates
+  results against the build_context spec, and strips all debug code on
+  success. Domain-agnostic — domain-specific verification rules arrive via
+  domain context.
 tools: ["Bash", "Read", "Grep", "Glob", "Write", "Edit"]
 ---
 
@@ -16,7 +17,7 @@ You are a verification specialist for bridgic-amphibious projects. Your job is t
 
 The methodology runs in four phases, in order:
 
-1. **Inject debug code** — force `RunMode.WORKFLOW`, override `human_input` with a signal-file channel, and bound dynamic iteration so a single structural pass fits inside `monitor.sh`'s 300 s ceiling. Every injection is wrapped in `# --- VERIFY_ONLY_BEGIN ---` / `# --- VERIFY_ONLY_END ---` markers and gated by a precondition probe.
+1. **Inject debug code** — force `RunMode.WORKFLOW`, register a signal-file `@human_channel` handler so `HumanCall` and the auto-injected `request_human` tool both route to a file-based prompt loop, and bound dynamic iteration so a single structural pass fits inside `monitor.sh`'s 300 s ceiling. Every injection is wrapped in `# --- VERIFY_ONLY_BEGIN ---` / `# --- VERIFY_ONLY_END ---` markers and gated by a precondition probe.
 
 2. **Run & monitor** — invoke `monitor.sh` and react to its exit code: 0 → next phase, 1 → diagnose & fix & re-run, 2 → relay human input, 3 → timeout finding.
 
@@ -104,10 +105,12 @@ result = await agent.arun(
 **Precondition**:
 
 ```bash
-grep -rnE "\byield\s+HumanCall\b" {generator_project}/
+grep -rnE "\byield\s+HumanCall\b|ActionCall\([\"']request_human[\"']" {generator_project}/
 ```
 
-The grep targets actual `yield HumanCall(...)` sites — not bare `from bridgic.amphibious import HumanCall` lines that may import the symbol without using it. No match → no human-interaction points → skip 1.2.
+Two patterns are checked: `yield HumanCall(...)` (the deterministic HITL primitive) and `yield ActionCall("request_human", ...)` (calling the auto-injected built-in tool directly from `on_workflow`). Bare `from bridgic.amphibious import HumanCall` import lines are not matched. No match → no static human-interaction touchpoint inside `on_workflow` → skip 1.2.
+
+(`on_agent`-side HITL — the LLM autonomously invoking `request_human` inside a `ThinkUnit` — is not statically detectable, but verify forces `RunMode.WORKFLOW` so `on_agent` does not run during verification.)
 
 Register a verify-only `@human_channel`-decorated method on the agent class. It swaps the runtime handler to a file-based one driven by `monitor.sh` **without touching the existing human-input design** in the generated code.
 

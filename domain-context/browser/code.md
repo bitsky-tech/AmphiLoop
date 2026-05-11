@@ -132,15 +132,14 @@ async def after_action(self, step_result, ctx):
 
 The `bash` built-in is auto-injected, so `tools=` only carries any custom `TASK_TOOLS`. Cleanup goes in `finally` so the persistent browser process is released on either successful exit or unexpected raise.
 
-- **Launch parameters** (headless, viewport, channel, etc.) are **not** surfaced as flags on `bridgic-browser` action commands, so the only runtime injection point is `BRIDGIC_BROWSER_JSON`. Mirror the exploration report's `bridgic-browser.json` content 1:1 into `os.environ["BRIDGIC_BROWSER_JSON"]` before `agent.arun(...)` — the example below uses an inline `json.dumps({...})` dict for readability.
-- **Isolated mode** (browser env mode = Isolated): set `"user_data_dir": "<PROJECT_ROOT>/.bridgic/browser"` in the JSON config. **Default mode**: omit `user_data_dir`. Default-mode mismatches with the exploration report's launch parameters break shared-state assumptions.
+- **Launch parameters** (headless, viewport, channel, etc.) are **not** surfaced as flags on `bridgic-browser` action commands, so the only runtime injection point is the `BRIDGIC_BROWSER_JSON` env var on the daemon-startup process. The single source of truth is the file `{PROJECT_ROOT}/.bridgic/bridgic-browser.json` written during exploration; `main.py` just bridges that file into the env var at startup (no Browser params constructed in Python, no duplicated JSON dict).
+- **Default vs Isolated** is purely a difference inside the JSON file: Isolated mode adds a `"user_data_dir": "<PROJECT_ROOT>/.bridgic/browser"` entry; Default mode omits the key (and the browser falls back to its persistent profile at `~/.bridgic/bridgic-browser/user_data/`). `main.py` does not branch on the mode — it just reads whatever the file contains.
 - **Goal**: hardcode the task description as a string in `main.py`. Multi-line descriptions go into a triple-quoted constant.
 
 Run-mode and LLM initialization follow `amphibious-code.md` §3 — no browser-specific override.
 
 ```python
 import asyncio
-import json
 import os
 import subprocess
 from pathlib import Path
@@ -153,6 +152,9 @@ from bridgic.amphibious import RunMode
 
 from amphi import Amphi, AmphiContext, TASK_TOOLS
 
+PROJECT_ROOT = Path(__file__).parent.parent
+BROWSER_CONFIG = PROJECT_ROOT / ".bridgic" / "bridgic-browser.json"
+
 GOAL = """
 <paste the task description here; multi-line OK>
 """.strip()
@@ -160,15 +162,13 @@ GOAL = """
 
 async def main():
     # .env lives at PROJECT_ROOT (one level above this file's directory).
-    load_dotenv(Path(__file__).parent.parent / ".env")
+    load_dotenv(PROJECT_ROOT / ".env")
 
-    # Mirror the exploration report's launch parameters through the daemon
-    # config env var. Add `user_data_dir` under Isolated mode; omit it under
-    # Default mode.
-    os.environ["BRIDGIC_BROWSER_JSON"] = json.dumps({
-        "headless": False,
-        # "user_data_dir": str(Path(__file__).parent.parent / ".bridgic" / "browser"),
-    })
+    # Bridge the browser config file into the env var the daemon reads at
+    # startup. The file is the single source of truth (written during
+    # exploration); main.py does not construct browser params here.
+    if BROWSER_CONFIG.exists():
+        os.environ["BRIDGIC_BROWSER_JSON"] = BROWSER_CONFIG.read_text()
 
     llm = None  # configure OpenAILlm here when llm_configured = yes; full pattern in amphibious-code.md §3.
 

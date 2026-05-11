@@ -47,7 +47,7 @@ uv run bridgic-browser snapshot
 uv run bridgic-browser click @xxx
 ```
 
-Record the JSON content verbatim in the report's Domain Guidance section — the code phase mirrors it 1:1 via the `BRIDGIC_BROWSER_JSON` env var in `main.py` (see `domain-context/browser/code.md` Phase 3).
+Record the JSON content verbatim in the report's Domain Guidance section (for documentation). The file itself is the canonical source — it persists into the code phase, and `main.py` reads it at startup to populate the `BRIDGIC_BROWSER_JSON` env var (see `domain-context/browser/code.md` Phase 3).
 
 ## Observation protocol
 

@@ -132,7 +132,7 @@ async def after_action(self, step_result, ctx):
 
 The `bash` built-in is auto-injected, so `tools=` only carries any custom `TASK_TOOLS`. Cleanup goes in `finally` so the persistent browser process is released on either successful exit or unexpected raise.
 
-- **Launch parameters** (headless, viewport, channel, etc.) are **not** settable as flags on `bridgic-browser` action commands. The CLI's only launch flags are `--headed` and `--clear-user-data` on `open` / `search`. Mirror the exploration report's launch parameters through the `BRIDGIC_BROWSER_JSON` env var (or a `./bridgic-browser.json` file).
+- **Launch parameters** (headless, viewport, channel, etc.) are **not** surfaced as flags on `bridgic-browser` action commands, so the only runtime injection point is `BRIDGIC_BROWSER_JSON`. Mirror the exploration report's `bridgic-browser.json` content 1:1 into `os.environ["BRIDGIC_BROWSER_JSON"]` before `agent.arun(...)` — the example below uses an inline `json.dumps({...})` dict for readability.
 - **Isolated mode** (browser env mode = Isolated): set `"user_data_dir": "<PROJECT_ROOT>/.bridgic/browser"` in the JSON config. **Default mode**: omit `user_data_dir`. Default-mode mismatches with the exploration report's launch parameters break shared-state assumptions.
 - **Goal**: hardcode the task description as a string in `main.py`. Multi-line descriptions go into a triple-quoted constant.
 

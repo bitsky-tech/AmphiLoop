@@ -68,7 +68,7 @@ Before walking the task itself, build the picture of the tools that operate on i
 
 ### 1.1 Pre-distilled domain context (already done for you)
 
-`domain_context_path`, when not `none`, is a pre-baked tool-knowledge cheat-sheet for a known domain — the standing output of this Phase-1 distillation. Example: `domain-context/browser/explore.md` covers the observation protocol, ref-classification rules, launch-parameter conventions, and cleanup protocol for `bridgic-browser`.
+`domain_context_path`, when not `none`, is a pre-baked tool-knowledge cheat-sheet for a known domain — the standing output of this Phase-1 distillation.
 
 Bootstrap already loaded it; its directives are authoritative for the topics it covers. **§1.2 skips whatever §1.1 already covers.**
 

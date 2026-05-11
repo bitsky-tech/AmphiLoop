@@ -8,11 +8,46 @@ Browser exploration drives the `bridgic-browser` CLI directly. State-mutating ac
 
 ## Setup protocol
 
-Install the skill into PROJECT_ROOT's shared uv env:
+Install the `bridgic-browser` CLI tool into PROJECT_ROOT's shared uv env:
 
 ```bash
 bash {PLUGIN_ROOT}/skills/bridgic-browser/scripts/install-deps.sh {PROJECT_ROOT}
 ```
+
+## Browser configuration (pre-config once)
+
+Pre-configure all launch parameters **before the first `bridgic-browser open` / `search`** by writing `{PROJECT_ROOT}/.bridgic/bridgic-browser.json`, then load it via the `BRIDGIC_BROWSER_JSON` env var on that first command (daemon startup). The daemon persists across CLI invocations, so every subsequent action talks to the already-configured daemon and runs clean — no `--headed`, no `--clear-user-data`, just `bridgic-browser open https://...`.
+
+The auxiliary context includes a **browser mode** (`Default` or `Isolated`); merge it with task-specific needs into one JSON:
+
+| Key | Set when | Value |
+|---|---|---|
+| `headless` | Task needs login or visual debugging | `false` (default: `true`) |
+| `user_data_dir` | Browser mode = `Isolated` | `"{PROJECT_ROOT}/.bridgic/browser"` — `mkdir -p` it beforehand. Omit under `Default` (the browser uses its default profile at `~/.bridgic/bridgic-browser/user_data/`). |
+| `viewport` | Layout-sensitive task | `{"width": 1280, "height": 720}` (default: `1600x900`) |
+| `channel` | Need system Chrome (e.g. Google OAuth) | `"chrome"` |
+
+Write the file once, then start the daemon with the env var on the first command — subsequent commands run clean:
+
+```bash
+mkdir -p {PROJECT_ROOT}/.bridgic/browser    # only when Isolated; under Default just `mkdir -p {PROJECT_ROOT}/.bridgic`
+cat > {PROJECT_ROOT}/.bridgic/bridgic-browser.json <<'JSON'
+{
+  "headless": false,
+  "user_data_dir": "{PROJECT_ROOT}/.bridgic/browser"
+}
+JSON
+
+# First command: daemon startup loads the JSON via env var.
+BRIDGIC_BROWSER_JSON="$(cat {PROJECT_ROOT}/.bridgic/bridgic-browser.json)" \
+  uv run bridgic-browser open https://example.com
+
+# Subsequent commands: clean — they talk to the running daemon.
+uv run bridgic-browser snapshot
+uv run bridgic-browser click @xxx
+```
+
+Record the JSON content verbatim in the report's Domain Guidance section — the code phase mirrors it 1:1 via the `BRIDGIC_BROWSER_JSON` env var in `main.py` (see `domain-context/browser/code.md` Phase 3).
 
 ## Observation protocol
 
@@ -45,24 +80,16 @@ Decision rule: a ref is STABLE only if you have **observed it twice** — once i
 
 When recording a STABLE ref, copy the **exact** hex string from the snapshot — do not abbreviate, do not paraphrase, do not try to "name" the element instead. Future executors read this value verbatim.
 
-## Browser launch parameters
-
-Record the **full launch parameters** used in this phase (headless, channel, args, viewport, etc., **excluding `user-data-dir`**) into the report's Domain Guidance section. Subsequent phases mirror these values to keep runtime behavior consistent with what was observed.
-
-Setting guide:
-- If the task requires login, launch in non-headless mode to facilitate authentication.
-
-## Browser environment mode
-
-The auxiliary context will include a **browser mode** value (`Default` or `Isolated`):
-
-- **Isolated** → use `user-data-dir = {PROJECT_ROOT}/.bridgic/browser/`. Create this directory before launching, and **delete the entire `{PROJECT_ROOT}/.bridgic/browser/` directory** after exploration is complete and resources are cleaned up.
-- **Default** → omit `user-data-dir`; the browser uses its default profile.
-
 ## Cleanup protocol
 
-Run once at the end of exploration to release all browser processes started by `bridgic-browser`:
+After exploration is complete, release all browser processes started by `bridgic-browser`:
 
 ```bash
 uv run bridgic-browser close
+```
+
+Under `Isolated` mode, also remove the user_data_dir created during configuration — each phase starts from a clean state:
+
+```bash
+rm -rf {PROJECT_ROOT}/.bridgic/browser
 ```

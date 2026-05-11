@@ -64,7 +64,7 @@ claude plugin install AmphiLoop
 |-------|-------------|
 | **bridgic-browser** | Browser automation via CLI (`bridgic-browser ...`) or Python SDK (`from bridgic.browser`) |
 | **bridgic-amphibious** | Building dual-mode agents with `AmphibiousAutoma`, `CognitiveWorker`, `on_agent`/`on_workflow` |
-| **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `OpenAILikeLlm`, `VllmServerLlm`), configuring `OpenAIConfiguration` |
+| **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `VllmServerLlm`), configuring `OpenAIConfiguration` |
 
 ## Agents
 

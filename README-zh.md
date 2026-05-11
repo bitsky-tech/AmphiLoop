@@ -96,7 +96,7 @@ Skills 是领域知识参考，agent 会根据对话上下文自动加载，无�
 |-------|---------|
 | **bridgic-browser** | 使用浏览器自动化 CLI（`bridgic-browser ...`）或 Python SDK（`from bridgic.browser`） |
 | **bridgic-amphibious** | 使用双模框架（`AmphibiousAutoma`、`CognitiveWorker`、`on_agent`/`on_workflow`） |
-| **bridgic-llms** | 初始化 LLM 提供商（`OpenAILlm`、`OpenAILikeLlm`、`VllmServerLlm`） |
+| **bridgic-llms** | 初始化 LLM 提供商（`OpenAILlm`、`VllmServerLlm`） |
 
 ## 架构
 
@@ -111,7 +111,8 @@ AmphiLoop/
 │   ├── bridgic-browser/         #   浏览器自动化 CLI + SDK
 │   ├── bridgic-amphibious/      #   双模 Agent 框架
 │   └── bridgic-llms/            #   LLM 提供商集成
-├── agents/                      # 执行方法论（3 个 agents）
+├── agents/                      # 执行方法论（4 个 agents）
+│   ├── amphibious-config.md     #   流水线配置（由 /build Phase 2 内联加载）
 │   ├── amphibious-explore.md    #   抽象探索方法论
 │   ├── amphibious-code.md       #   代码生成专家
 │   └── amphibious-verify.md     #   项目验证专家

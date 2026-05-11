@@ -95,7 +95,7 @@ Skills are domain knowledge references that agents and Claude load automatically
 |-------|---------------|
 | **bridgic-browser** | Using browser automation via CLI (`bridgic-browser ...`) or Python SDK (`from bridgic.browser`) |
 | **bridgic-amphibious** | Building dual-mode agents with `AmphibiousAutoma`, `CognitiveWorker`, `on_agent`/`on_workflow` |
-| **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `OpenAILikeLlm`, `VllmServerLlm`) |
+| **bridgic-llms** | Initializing LLM providers (`OpenAILlm`, `VllmServerLlm`) |
 
 ## Architecture
 
@@ -110,7 +110,8 @@ AmphiLoop/
 │   ├── bridgic-browser/         #   Browser automation CLI + SDK
 │   ├── bridgic-amphibious/      #   Dual-mode agent framework
 │   └── bridgic-llms/            #   LLM provider integration
-├── agents/                      # Execution methodology (3 agents)
+├── agents/                      # Execution methodology (4 agents)
+│   ├── amphibious-config.md     #   Pipeline configuration (inline-loaded by /build Phase 2)
 │   ├── amphibious-explore.md    #   Abstract exploration methodology
 │   ├── amphibious-code.md       #   Code generation expert
 │   └── amphibious-verify.md     #   Project verification expert

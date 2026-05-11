@@ -14,9 +14,9 @@ Present the options as:
 >
 > Enter **1** or **2** (default: 1):
 
-Record the chosen **browser mode** — it must be forwarded to Phases 3, 4, and 5 as part of the auxiliary context passed to each sub-agent. Specifically:
+Record the chosen **browser mode** in `build_context.md`'s `domain_config`. Phase 3 (exploration) reads it to decide what to write into `{PROJECT_ROOT}/.bridgic/bridgic-browser.json` — the canonical browser config file Phases 4 (code) and 5 (verify) inherit. The mode determines a single key in that file:
 
-- **Isolated mode** → pass `user-data-dir = {PROJECT_ROOT}/.bridgic/browser/` to every sub-agent that launches a browser.
-- **Default mode** → omit `user-data-dir`; the browser uses its default profile and shared state.
+- **Isolated** → `"user_data_dir": "{PROJECT_ROOT}/.bridgic/browser"` is added to the JSON. That directory becomes the project's private browser profile.
+- **Default** → `user_data_dir` is omitted from the JSON; the browser uses its persistent default profile at `~/.bridgic/bridgic-browser/user_data/`.
 
 Do **not** perform a final summary confirmation here — the caller (Phase 2 in `commands/build.md`) owns the single end-of-Phase-2 summary and will include `browser mode` in it.

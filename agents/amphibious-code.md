@@ -249,7 +249,19 @@ When no extra fields are needed — a pure CLI workflow with no Python-side stat
 
 An async generator that yields framework primitives — `ActionCall`, `EnterAgent`, `HumanCall`, `LLMCall`, `RETURN`. Translate the exploration report's "Operation Sequence" into yields, preserving order, parameters, and stability annotations.
 
-1. **Single-line `yield ActionCall(...)`; fixed argument order**: `tool_name` (positional) → action-payload kwargs (`command=` for `bash`; corresponding field for other tools) → `description=` last. Line width is not a constraint; `on_workflow` reads as one-line-per-action. `description=` is required — it's the goal string `on_agent` receives during step-level fallback; write as intent ("Click 生成图片 to enter image-gen mode"), not command name ("Click 生成图片").
+1. **`yield ActionCall(...)` MUST be written on a single line — multi-line yields are forbidden, no exceptions**. Line length is not a reason to wrap; long lines are expected. Argument order is fixed: `tool_name` (positional) → action-payload kwargs (`command=` for `bash`; corresponding field for other tools) → `description=` last. `description=` is required — it's the goal string `on_agent` receives during step-level fallback; write as intent ("Click 生成图片 to enter image-gen mode"), not command name ("Click 生成图片").
+
+   ```python
+   # ❌ Forbidden — multi-line yield
+   yield ActionCall(
+       "bash",
+       command=CMD_OPEN_CHATGPT,
+       description="Open chatgpt.com",
+   )
+
+   # ✅ Required — single line, regardless of length
+   yield ActionCall("bash", command=CMD_OPEN_CHATGPT, description="Open chatgpt.com")
+   ```
 
 2. **One yield per operation-sequence step.** Numbered step in the report → one yield, in the same order. Sub-generators are only justified when the same sub-sequence repeats with parameter variation; a sub-generator called once is hide-and-seek — inline it.
 

@@ -79,52 +79,50 @@ Condition-based waits use a text argument: `bridgic-browser wait "Submit"` waits
 
 **Never modify page state via JavaScript.** Don't use `eval-on` (or any JS execution) to set form values, trigger clicks, or manipulate DOM. JS-based DOM changes bypass the frontend framework's event bindings — the page appears to change but internal state remains stale. `eval-on` is acceptable for **reading** data only, never for writing.
 
-**No `bridgic-browser snapshot` / `tabs` from inside `on_workflow`** — the §2.7 `observation` hook keeps `ctx.observation` fresh; read it directly.
+**No `bridgic-browser snapshot` / `tabs` from inside `on_workflow`** — state reads belong in the §2.7 hook layer (`observation` or `after_action`); `on_workflow` reads `ctx.observation` directly.
 
 ### 2.7 Hooks — `observation` and `after_action`
 
-Hooks are async generators that can yield `ActionCall` directly — no `asyncio.create_subprocess_exec` boilerplate needed to drive `bridgic-browser`.
+Hooks are async generators that can yield `ActionCall` directly — no `asyncio.create_subprocess_exec` boilerplate needed to drive `bridgic-browser`. Two patterns are valid, both relying on the framework's `observation` None-preserve semantics (see `agents/amphibious-code.md` §2.8):
 
-**`observation` — live browser state before each step.** Yield `bash` ActionCalls inside the hook and use `RETURN` to set `ctx.observation`:
+**Passive (recommended)** — omit the `observation` override; `after_action` refreshes `ctx.observation` only after state-changing actions (mostly the `wait` subcommand). Cheap because most browser yields are deterministic clicks whose downstream consumer never reads observation; only a few decision points (login check, alt-text judgement, …) need fresh state, and they always come right after a `wait`.
+
+```python
+from bridgic.amphibious import ActionCall, ActionResult
+
+
+async def after_action(self, step_result, ctx):
+    action_result = step_result.result
+    if not isinstance(action_result, ActionResult):
+        return
+    for step in action_result.results:
+        if not (step.success and step.tool_name == "bash"):
+            continue
+        cmd = (step.tool_arguments or {}).get("command", "")
+        if "bridgic-browser wait" in cmd:
+            snap = yield ActionCall("bash", description="Snapshot after a wait completes", command="uv run bridgic-browser snapshot")
+            ctx.observation = str(snap[0].result) if snap and snap[0].result else ""
+            return
+```
+
+**Active** — `observation` snapshots before every cognitive step. Useful when *every* think_unit decision depends on freshly-fetched state (e.g. agent mode driving an open-ended search). Costs one extra snapshot per yield, which adds up on browser workflows that have many UI clicks per page lifecycle.
 
 ```python
 from bridgic.amphibious import ActionCall, RETURN
 
+
 async def observation(self, ctx):
     tabs = yield ActionCall("bash", description="List open tabs", command="uv run bridgic-browser tabs")
-    snapshot = yield ActionCall("bash", description="Take a page snapshot",command="uv run bridgic-browser snapshot")
+    snap = yield ActionCall("bash", description="Snapshot the current page", command="uv run bridgic-browser snapshot")
     parts = []
     if tabs and tabs[0].result:
         parts.append(f"[Open tabs]\n{tabs[0].result}")
-    if snapshot and snapshot[0].result:
-        parts.append(f"[Snapshot]\n{snapshot[0].result}")
+    if snap and snap[0].result:
+        parts.append(f"[Snapshot]\n{snap[0].result}")
     yield RETURN("\n\n".join(parts) if parts else "No page loaded.")
 ```
 
-**`after_action` — refresh observation after `wait`.** The pre-yield `observation` hook only fires before the **next** yield, so inline Python between a `wait` yield and the next yield reads stale state without an explicit refresh. `after_action` is also an async generator and can yield `ActionCall` directly:
-
-```python
-from bridgic.amphibious import ActionCall
-
-async def after_action(self, step_result, ctx):
-    action_result = step_result.result
-    if not hasattr(action_result, "results"):
-        return
-    for step in action_result.results:
-        if not step.success:
-            continue
-        cmd = (getattr(step, "args", None) or {}).get("command", "")
-        if step.tool_name == "bash" and "bridgic-browser wait" in cmd:
-            tabs = yield ActionCall("bash", command="uv run bridgic-browser tabs")
-            snapshot = yield ActionCall("bash", command="uv run bridgic-browser snapshot")
-            parts = []
-            if tabs and tabs[0].result:
-                parts.append(f"[Open tabs]\n{tabs[0].result}")
-            if snapshot and snapshot[0].result:
-                parts.append(f"[Snapshot]\n{snapshot[0].result}")
-            ctx.observation = "\n\n".join(parts) if parts else "No page loaded."
-            break
-```
+For most browser workflows, passive is the right default. Reach for active only when each cognitive step genuinely needs fresh state.
 
 ---
 

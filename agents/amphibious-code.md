@@ -128,18 +128,18 @@ The scaffold dropped a single `amphi.py` skeleton. Phase 2 fills it in, adding s
 
 ### 2.1 File layout (conditional)
 
-`amphi.py` contains **only** `AmphiContext` (CognitiveContext subclass) and the `AmphibiousAutoma` subclass. Every other concern has a designated sibling file; create each sibling only when content of that kind actually emerges. Empty placeholder files are not shipped.
+`amphi.py` holds `AmphiContext`, the `AmphibiousAutoma` subclass, and any module-level pure functions or `@staticmethod` / `@classmethod` that have no sibling home — typically non-trivial assembly or transformation logic. Each sibling file is created only when content of its kind exists; no empty placeholders.
 
 | File | What it holds | When to create |
 |---|---|---|
-| `amphi.py` | `AmphiContext` + the agent class | Always (scaffolded) |
+| `amphi.py` | `AmphiContext` + the agent class + module-level pure functions that don't fit a sibling (assembly, transformation algorithms) | Always (scaffolded) |
 | `main.py` | Entry point: env, LLM, agent, `arun()` | Always (Phase 3) |
 | `schemas.py` | Pydantic models — LLM structured outputs + state records held by `AmphiContext` | Any Pydantic model exists |
 | `prompts.py` | `build_*_prompt(...)` + prompt-side constants | Any non-trivial LLM prompt is built |
-| `helpers.py` | Tunables, domain constants, CLI shortcuts, JS snippets, command builders, VOLATILE parsers, assembly, local I/O | Any helper of these kinds exists |
+| `helpers.py` | **Execution parameters only** — STABLE constants (refs, URLs, recurring CLI commands, tunables) + VOLATILE resolvers (`find_X(observation)` parsers). The exploration-report → runtime bridge | Any STABLE constant or VOLATILE resolver exists |
 | `tools.py` | Custom `FunctionToolSpec` registrations + `TASK_TOOLS` | `TASK_TOOLS` is non-empty |
 
-The hard rule: **`amphi.py` never absorbs content that has a designated sibling home**. The moment a Pydantic model exists it goes in `schemas.py`; the moment a CLI command constant exists it goes in `helpers.py`. This prevents the junk-drawer pattern that grows when "just one more thing" gets dropped into `amphi.py`.
+The hard rule: **content with a designated sibling home never goes in `amphi.py`** — Pydantic → `schemas.py`; STABLE constants + VOLATILE resolvers → `helpers.py`; custom tools → `tools.py`. This blocks both the junk-drawer in `amphi.py` and the parameter-soup in `helpers.py`.
 
 Import direction is one-way: `schemas → prompts → helpers → tools → amphi → main`. `main.py` does `from amphi import Amphi, AmphiContext` plus, when `tools.py` exists, `from tools import TASK_TOOLS`; when no custom tools exist, pass `tools=[]` directly to `arun(...)` and skip `tools.py`.
 
@@ -172,28 +172,72 @@ Pass the chosen mode explicitly to `main.py`'s `arun(...)` — never rely on `Ru
 
 **`prompts.py`** — `build_*_prompt(...)` functions returning the LLM input string for one prompt-shape. Prompt-side constants (negation suffixes, style prefixes) and `format_*` helpers for HITL human-display rendering also go here. Pulling prompts out is what keeps `on_workflow` readable as an operation sequence rather than a wall of triple-quoted strings.
 
-**`helpers.py`** — Everything the workflow uses at runtime that is NOT a registered task tool. Use `# === Section ===` dividers to separate layers (tunables / domain refs / CLI shortcuts / JS / command builders / parsers / assembly / local I/O):
+**`helpers.py`** — The **execution-parameters module**, bridging the exploration report's STABLE/VOLATILE annotations to the workflow. Two buckets:
+
+| Bucket | Source | Form |
+|---|---|---|
+| **STABLE constants** | Values tagged STABLE in `exploration_report.md` | Module-level constants: refs, URLs, recurring CLI commands, tunable thresholds. `UPPER_SNAKE_CASE`. |
+| **VOLATILE resolvers** | Values tagged VOLATILE — must be parsed from a runtime observation | Pure functions `find_X(observation: str) -> X` (extra kwargs when needed). No I/O, no `yield`. |
+
+Use `# === Section ===` dividers between buckets:
 
 ```python
-# === Tunables ===
+# === STABLE constants ===
 MAX_ATTEMPTS = 3
+SEARCH_BUTTON_REF = "4084c4ad"                          # STABLE per exploration_report.md §2 step 5
+CMD_OPEN_HOME = f"uv run bridgic-browser open {URL}"    # recurring, parameter-free CLI command
 
-# === Stable domain refs (from exploration_report.md §2) ===
-SEARCH_BUTTON_REF = "4084c4ad"
-
-# === CLI command shortcuts ===
-CMD_OPEN = f"uv run bridgic-browser open {URL}"
-
-# === VOLATILE parsers ===
-def extract_last_alt(observation: str) -> str: ...
-
-# === Local I/O ===
-async def save_image_from_data_url(file_path, data_url): ...
+# === VOLATILE resolvers ===
+def find_last_alt(observation: str) -> str:
+    """Per-iteration alt-text extraction — value regenerates per page navigation."""
+    ...
 ```
 
-VOLATILE parsers are the most fragile layer: pure (no I/O / no `yield`), base each on real artifact data under `<PROJECT_ROOT>/.bridgic/explore/`, validate against that file before writing `on_workflow`. STABLE refs go under `# === Stable domain refs ===` as constants, never through parsers (Principle #3).
+**Nothing else.** Non-parameter logic (assembly, transformation, sync utilities) → `amphi.py`. Custom tools registered in `TASK_TOOLS` → `tools.py`. Trivial one-liners → inlined at the call site (per "No trivial wrappers" below).
+
+**Import convention**: `import helpers as H`, then `H.UPPER_NAME` for constants and `H.find_X(obs)` for resolvers. **Never** `from helpers import (a, b, c, …)` multi-symbol blocks.
+
+**STABLE fallback folds into the resolver, not the caller.** When a parameter has both a STABLE-tagged value AND a VOLATILE parser (typical for browser refs that may regenerate per session), the resolver itself falls back. Callers always write `H.find_X(obs)` — never `H.find_X(obs) or H.X_FALLBACK`.
+
+```python
+# helpers.py — VOLATILE resolver with STABLE fallback built in
+TEXTBOX_REF_FALLBACK = "f2a54f53"   # STABLE per exploration_report.md §2 step 9
+
+def find_textbox_ref(observation: str) -> str:
+    """Locate the prompt textbox in the current snapshot; fall back to the
+    STABLE-tagged value from exploration when the live DOM hasn't rendered
+    a fresh ref yet.
+    """
+    match = _TEXTBOX_RE.search(observation)
+    return match.group(1) if match else TEXTBOX_REF_FALLBACK
+
+# Caller — no `or` boilerplate at the yield site:
+yield ActionCall("bash", command=f"uv run bridgic-browser fill @{H.find_textbox_ref(obs)} ...", description="Fill prompt")
+```
+
+VOLATILE resolvers are the most fragile layer — base each on real artifact data under `<PROJECT_ROOT>/.bridgic/explore/`, validate against that artifact before writing `on_workflow`.
 
 **No trivial wrappers**: a one-line function (`f"..."`, `Path(...).read_text()`, `Path(...).write_text(...)`, etc.) called from a single site does not belong in `helpers.py` — inline it. `helpers.py` is for cross-site reuse, non-trivial parsing, or named algorithms.
+
+**No CLI command-builder functions.** A function whose body interpolates parameters into a CLI string at runtime — `cmd_click(ref)`, `cmd_wait(seconds)`, `cmd_fill_xxx(text, ref)`, and their support helpers like `_shell_quote()` — is **forbidden**, even when called from multiple yield sites. Two cases cover everything legitimate: a **recurring command with no parameters** is a module-level constant; a **one-off parameterised command** is an inline f-string at the yield site. Builder functions fragment the workflow's commands across two files and hide the actual command shape from anyone reading `on_workflow`.
+
+```python
+# ❌ Forbidden — CLI builder function (plus its shell-quote support)
+def cmd_click(ref: str) -> str:
+    return f"uv run bridgic-browser click @{ref}"
+
+def _shell_quote(text: str) -> str:
+    return "'" + text.replace("'", "'\"'\"'") + "'"
+
+# ...somewhere in on_workflow:
+yield ActionCall("bash", command=cmd_click(SEARCH_BUTTON_REF), description="Click Search")
+
+# ✅ Required — recurring → constant, one-off → inline f-string at the yield site
+CMD_OPEN_HOME = "uv run bridgic-browser open https://example.com"   # recurring, parameter-free → constant
+# ...
+yield ActionCall("bash", command=CMD_OPEN_HOME, description="Open home page")
+yield ActionCall("bash", command=f"uv run bridgic-browser click @{SEARCH_BUTTON_REF}", description="Click Search")
+```
 
 **`tools.py`** — Custom `FunctionToolSpec` registrations. The function's docstring becomes the description the LLM sees during fallback — make it precise and parameter-accurate.
 
@@ -265,6 +309,28 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
 
 2. **One yield per operation-sequence step.** Numbered step in the report → one yield, in the same order. Sub-generators are only justified when the same sub-sequence repeats with parameter variation; a sub-generator called once is hide-and-seek — inline it.
 
+   When a sub-generator IS justified, **it MUST be an `async def` returning an async generator that yields framework primitives, drained by the caller via `async for ... yield`. Regular `async def` methods that drive the environment through `await self.<private_subprocess_helper>(...)` are forbidden** — they build a shadow workflow the framework can't see, trace, or recover via `on_agent` fallback.
+
+   ```python
+   # ❌ Forbidden — regular async method that bypasses ActionCall via private subprocess wrappers
+   async def _generate_one_image(self, ctx, candidate):
+       await self._run_browser_cmd(CMD_OPEN_HOME, wait_s=3)
+       await self._run_browser_cmd(CMD_CLICK_GENERATE, wait_s=2)
+       snap = await self._take_snapshot_via_subprocess()
+       ...
+
+   # ✅ Required — async generator yielding primitives; caller drains via `async for ... yield`
+   async def _generate_one_image(self, ctx, candidate):
+       yield ActionCall("bash", command=CMD_OPEN_HOME, description="Open chatgpt home")
+       yield ActionCall("bash", command=CMD_CLICK_GENERATE, description="Enter image generation mode")
+       ...
+
+   async def on_workflow(self, ctx):
+       for candidate in ctx.candidates:
+           async for primitive in self._generate_one_image(ctx, candidate):
+               yield primitive
+   ```
+
 3. **STABLE refs live in `helpers.py` as constants; VOLATILE refs go through `helpers.py` parsers** (Principle #3).
 
    ```python
@@ -294,6 +360,21 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
    `EnterAgent` is a **mode-switch signal**: workflow suspends, `on_agent` runs until exhausted, control resumes at the next yield. Use it when the sub-task needs **agent capability** — a tool-using OTC loop that reacts to dynamic state. For pure single-shot LLM reasoning over given inputs, prefer `LLMCall` — `EnterAgent` is over-kill. **Only valid in `amphiflow` mode.** `LLMCall.chat` returns `str`, `.structure_output(constraint=PydanticModel(model=Schema))` returns a Pydantic instance, `.tool_selector(...)` returns tool calls. `RETURN(value)` replaces `return value` (forbidden in async generators).
 
 6. **Built-in tools** — `bash`, `read_file`, `write_file`, `edit_file`, `glob`, `grep` are auto-injected; yield them by name. `write_file` / `edit_file` require a prior `read_file` on the same path.
+
+7. **No `self.llm.<method>(...)` calls inside the agent class.** All LLM invocations go through `yield LLMCall.chat(...)` / `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=Schema))` / `yield LLMCall.tool_selector(...)`. Wrappers like `await self.llm.astructured_output(...)` are **forbidden** — they bypass the cognitive context, tracing, observation hooks, and per-step recoverability. Applies inside sub-generators too (per point 2's shape).
+
+   ```python
+   # ❌ Forbidden — wrapper bypassing LLMCall via direct llm access
+   async def _llm_structured(self, schema, prompt):
+       from bridgic.core.model.types import Message
+       messages = [Message(role="user", content=prompt)]
+       return await self.llm.astructured_output(messages=messages, constraint=PydanticModel(model=schema))
+   # ...later:
+   verdict = await self._llm_structured(AcceptanceVerdict, build_prompt(...))
+
+   # ✅ Required — yield the primitive
+   verdict = yield LLMCall.structure_output(build_prompt(...), constraint=PydanticModel(model=AcceptanceVerdict))
+   ```
 
 ### 2.7 `amphi.py`: `on_agent`
 
@@ -374,6 +455,121 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
         decision = yield HumanCall(prompt="Approve the trade?", channel="feishu")
         yield HumanCall(prompt="Trade settled — close-of-day notice", channel="email")
 ```
+
+### 2.10 Annotated worked example
+
+A complete minimal project demonstrating the §2.4 / §2.6 patterns end-to-end. The task — **glob notes, ask LLM to filter, HITL-confirm, grep TODOs, write the result** — is deliberately chosen outside any framework-labeled domain (no browser, no messaging channel) so the SHAPES are easy to extract without copying domain detail.
+
+**Map the SHAPES onto your task's actual surface; do not transplant this example's vocabulary** (TODO / notes / candidate_paths) into a project that has nothing to do with file scanning.
+
+**`amphi.py`:**
+
+```python
+from pydantic import Field
+
+from bridgic.amphibious import (
+    AmphibiousAutoma,
+    ActionCall,
+    LLMCall,
+    HumanCall,
+    RETURN,
+    CognitiveContext,
+    PydanticModel,
+)
+
+import helpers as H
+
+from schemas import TodoSelection
+from prompts import build_select_prompt
+
+
+class TodoCollectorContext(CognitiveContext):
+    candidate_paths: list[str] = Field(default_factory=list)
+    selected_paths: list[str] = Field(default_factory=list)
+    collected: str = Field(default="")
+
+
+class TodoCollector(AmphibiousAutoma[TodoCollectorContext]):
+
+    async def on_workflow(self, ctx):
+        # Step 1: glob candidate markdown files.
+        listing = yield ActionCall("glob", pattern=H.NOTES_GLOB_PATTERN, description="Glob ~/notes/*.md")
+        ctx.candidate_paths = listing[0].result or []
+
+        # Step 2: LLM picks files likely to contain TODOs.
+        selection = yield LLMCall.structure_output(build_select_prompt(ctx.candidate_paths), constraint=PydanticModel(model=TodoSelection))
+        ctx.selected_paths = selection.paths
+
+        # Step 3: HITL — confirm or revise.
+        while True:
+            reply = yield HumanCall(prompt=f"Confirm processing {len(ctx.selected_paths)} files? Reply 'ok' or feedback.")
+            if reply.strip().lower() == "ok":
+                break
+            selection = yield LLMCall.structure_output(build_select_prompt(ctx.candidate_paths, user_feedback=reply), constraint=PydanticModel(model=TodoSelection))
+            ctx.selected_paths = selection.paths
+
+        # Step 4: per-file extraction — same sub-sequence per path → sub-generator.
+        for path in ctx.selected_paths:
+            async for primitive in self._collect_todos_from(path, ctx):
+                yield primitive
+
+        # Step 5: write the accumulated blocks once at the end.
+        yield ActionCall("bash", command=f"cat > {str(H.OUTPUT_PATH)!r} <<'__END__'\n{ctx.collected}\n__END__", description="Write all TODO blocks to result/todos.md")
+        yield RETURN(str(H.OUTPUT_PATH))
+
+    async def _collect_todos_from(self, path: str, ctx):
+        """Sub-generator. SHAPE: `async def` returning an async generator that
+        yields framework primitives — NOT an async method that awaits private
+        subprocess helpers. Mutates ctx freely, same as on_workflow.
+        """
+        grep = yield ActionCall("grep", pattern="TODO", path=path, description=f"Grep TODO lines from {path}")
+        lines = grep[0].result or []
+        if not lines:
+            return
+        ctx.collected += f"\n## {path}\n" + "\n".join(lines) + "\n"
+```
+
+**`helpers.py`:**
+
+```python
+from pathlib import Path
+
+# === Tunables / recurring constants ===
+NOTES_GLOB_PATTERN = "~/notes/*.md"
+OUTPUT_PATH = Path(__file__).parent / "result" / "todos.md"
+```
+
+**`schemas.py`:**
+
+```python
+from pydantic import BaseModel, Field
+
+
+class TodoSelection(BaseModel):
+    paths: list[str] = Field(description="Paths of markdown files likely to contain TODO items.")
+```
+
+**`prompts.py`:**
+
+```python
+def build_select_prompt(candidate_paths: list[str], user_feedback: str | None = None) -> str:
+    base = (
+        "Given these markdown file paths, pick those whose name suggests they "
+        "contain TODO items (roadmap, plan, todo, action_items, …):\n\n"
+        + "\n".join(candidate_paths)
+    )
+    if user_feedback:
+        base += f"\n\nUser feedback on the previous selection: {user_feedback}\nRevise accordingly."
+    return base
+```
+
+**Reading guide — patterns to absorb:**
+
+- **`on_workflow` is the workflow.** 5 numbered comments → 5 top-level yield points (steps 1, 2, 3-loop, 4-sub-generator drain, 5). Every environment-touching line is `yield ActionCall(...)`. (§2.6 #1, #2)
+- **Sub-generator SHAPE.** `_collect_todos_from` is `async def` returning an async generator that yields `ActionCall`. The caller drains via `async for primitive in self._collect_todos_from(path, ctx): yield primitive`. **Zero `await self._x_via_subprocess(...)` escape hatches.** (§2.6 #2)
+- **LLM via `LLMCall`.** Structured output uses `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=TodoSelection))`. No `self.llm.astructured_output(...)` anywhere in the class. (§2.6 #7)
+- **`helpers.py` = execution-parameters module.** Two STABLE constants (`NOTES_GLOB_PATTERN` / `OUTPUT_PATH`); zero VOLATILE resolvers (this task has no per-run-resolved values — a browser task would have both buckets). **No CLI builders, no assembly logic** — per-yield-varying parameters are inline f-strings at the yield site (step 5's bash command). (§2.4)
+- **Import convention**: `import helpers as H` → `H.NOTES_GLOB_PATTERN` / `H.OUTPUT_PATH`. **Never** `from helpers import (a, b, c, …)` multi-symbol blocks. (§2.4)
 
 ---
 

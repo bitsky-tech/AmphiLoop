@@ -193,6 +193,8 @@ async def save_image_from_data_url(file_path, data_url): ...
 
 VOLATILE parsers are the most fragile layer: pure (no I/O / no `yield`), base each on real artifact data under `<PROJECT_ROOT>/.bridgic/explore/`, validate against that file before writing `on_workflow`. STABLE refs go under `# === Stable domain refs ===` as constants, never through parsers (Principle #3).
 
+**No trivial wrappers**: a one-line function (`f"..."`, `Path(...).read_text()`, `Path(...).write_text(...)`, etc.) called from a single site does not belong in `helpers.py` — inline it. `helpers.py` is for cross-site reuse, non-trivial parsing, or named algorithms.
+
 **`tools.py`** — Custom `FunctionToolSpec` registrations. The function's docstring becomes the description the LLM sees during fallback — make it precise and parameter-accurate.
 
 ```python
@@ -247,7 +249,7 @@ When no extra fields are needed — a pure CLI workflow with no Python-side stat
 
 An async generator that yields framework primitives — `ActionCall`, `EnterAgent`, `HumanCall`, `LLMCall`, `RETURN`. Translate the exploration report's "Operation Sequence" into yields, preserving order, parameters, and stability annotations.
 
-1. **Every `ActionCall` includes `description="..."`.** It is debug-log text *and* the goal string `on_agent` receives during step-level fallback. Write it as intent ("Click 生成图片 to enter image-gen mode"), not command name ("Click 生成图片") — the fallback agent reads this to decide how to recover.
+1. **Single-line `yield ActionCall(...)`; fixed argument order**: `tool_name` (positional) → action-payload kwargs (`command=` for `bash`; corresponding field for other tools) → `description=` last. Line width is not a constraint; `on_workflow` reads as one-line-per-action. `description=` is required — it's the goal string `on_agent` receives during step-level fallback; write as intent ("Click 生成图片 to enter image-gen mode"), not command name ("Click 生成图片").
 
 2. **One yield per operation-sequence step.** Numbered step in the report → one yield, in the same order. Sub-generators are only justified when the same sub-sequence repeats with parameter variation; a sub-generator called once is hide-and-seek — inline it.
 
@@ -261,15 +263,15 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
 
    # ✅ Recorded once during exploration, declared once in helpers.py
    SEARCH_BUTTON_REF = "4084c4ad"  # STABLE per exploration_report.md §2 step 5
-   yield ActionCall("click_element_by_ref", description="Click Search to submit", ref=SEARCH_BUTTON_REF)
+   yield ActionCall("click_element_by_ref", ref=SEARCH_BUTTON_REF, description="Click Search to submit")
    ```
 
-4. **Recurring CLI commands → module constants in `helpers.py`** (`CMD_OPEN_HOME = f"uv run bridgic-browser open {URL}"`). Pre-computing these keeps yield sites readable on one line.
+4. **Recurring CLI commands → module constants in `helpers.py`** (e.g. `CMD_OPEN_HOME = f"uv run bridgic-browser open {URL}"`). One named constant beats re-typing the same f-string at multiple yield sites.
 
 5. **Pick the right yield primitive — prefer `ActionCall`.**
 
    ```python
-   yield ActionCall("save_record", description="Persist row to DB", **row)
+   yield ActionCall("save_record", **row, description="Persist row to DB")
    yield EnterAgent(goal="Categorize the record", tools=["tag_record"])
    yield HumanCall(prompt="Confirm before deleting?")
    yield HumanCall(prompt="Approve trade?", channel="feishu")        # specific channel (§2.9)
@@ -280,8 +282,6 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
    `EnterAgent` is a **mode-switch signal**: workflow suspends, `on_agent` runs until exhausted, control resumes at the next yield. Use it when the sub-task needs **agent capability** — a tool-using OTC loop that reacts to dynamic state. For pure single-shot LLM reasoning over given inputs, prefer `LLMCall` — `EnterAgent` is over-kill. **Only valid in `amphiflow` mode.** `LLMCall.chat` returns `str`, `.structure_output(constraint=PydanticModel(model=Schema))` returns a Pydantic instance, `.tool_selector(...)` returns tool calls. `RETURN(value)` replaces `return value` (forbidden in async generators).
 
 6. **Built-in tools** — `bash`, `read_file`, `write_file`, `edit_file`, `glob`, `grep` are auto-injected; yield them by name. `write_file` / `edit_file` require a prior `read_file` on the same path.
-
-7. **Pure-Python helpers go inline** — `await save_image_from_data_url(path, url)`, `text = render_report(records)`. Don't wrap a helper as an `ActionCall` to give it a description; the description is for tools.
 
 ### 2.7 `amphi.py`: `on_agent`
 
@@ -437,6 +437,7 @@ if __name__ == "__main__":
 - **LLM block conditional on `llm_configured`.** When `no`, pass `llm=None` and omit the imports — explicit beats implicit. When `yes`, instantiate `OpenAILlm` from env vars (loaded by `load_dotenv()`); read `bridgic-llms/SKILL.md` for the provider's exact signature.
 - **Tool assembly**: when `tools.py` exists, `from tools import TASK_TOOLS` and pass `tools=TASK_TOOLS`; otherwise pass `tools=[]` inline. The framework auto-injects the built-ins (bash / read_file / write_file / edit_file / glob / grep / request_human) on top, so `tools=` only carries the custom task tools.
 - **Mode**: pass `mode=RunMode.WORKFLOW` or `mode=RunMode.AMPHIFLOW` explicitly per `build_context.md → ## Pipeline → mode`.
+- **`result/` and `log/` resolve to `Path(__file__).parent / "..."`** (inside the generator project), NOT `Path(__file__).parent.parent / "..."` (PROJECT_ROOT).
 - **Logging wired only here** — keep `amphi.py` free of `logging.basicConfig`. Logs land in `log/run.log` so any external aggregator has one uniform location to read.
 - **No `config.py` by default.** Inline `os.getenv` in `main.py`. Split into a `config.py` only if env loading grows complex (many vars, validation, defaults).
 

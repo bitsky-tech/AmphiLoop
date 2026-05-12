@@ -43,9 +43,7 @@ Translate the exploration report's "Operation Sequence" into yields, with browse
 **Each browser action is a `bash` ActionCall on `bridgic-browser`.** The exploration step's CLI command goes through verbatim — STABLE refs interpolate as `@<hex>` arguments:
 
 ```python
-yield ActionCall("bash",
-                 description="Click Search",
-                 command=f"uv run bridgic-browser click @{SEARCH_BUTTON_REF}")
+yield ActionCall("bash", command=f"uv run bridgic-browser click @{SEARCH_BUTTON_REF}", description="Click Search to submit")
 ```
 
 **STABLE refs as module-level constants.** For every ref tagged STABLE in the exploration report, declare a constant near the top of `amphi.py` and interpolate it inline at the yield site. VOLATILE refs are extracted per-iteration via §2.3 helpers.
@@ -60,9 +58,7 @@ NEXT_BUTTON_REF     = "cbac3327"
 **Explicit `wait` after every state-mutating action** — itself a `bridgic-browser` subcommand:
 
 ```python
-yield ActionCall("bash",
-                 description="Wait for results to load",
-                 command="uv run bridgic-browser wait 3")
+yield ActionCall("bash", command="uv run bridgic-browser wait 3", description="Wait for results to load")
 ```
 
 Recommended durations:
@@ -100,7 +96,7 @@ async def after_action(self, step_result, ctx):
             continue
         cmd = (step.tool_arguments or {}).get("command", "")
         if "bridgic-browser wait" in cmd:
-            snap = yield ActionCall("bash", description="Snapshot after a wait completes", command="uv run bridgic-browser snapshot")
+            snap = yield ActionCall("bash", command="uv run bridgic-browser snapshot", description="Snapshot after a wait completes")
             ctx.observation = str(snap[0].result) if snap and snap[0].result else ""
             return
 ```
@@ -112,8 +108,8 @@ from bridgic.amphibious import ActionCall, RETURN
 
 
 async def observation(self, ctx):
-    tabs = yield ActionCall("bash", description="List open tabs", command="uv run bridgic-browser tabs")
-    snap = yield ActionCall("bash", description="Snapshot the current page", command="uv run bridgic-browser snapshot")
+    tabs = yield ActionCall("bash", command="uv run bridgic-browser tabs", description="List open tabs")
+    snap = yield ActionCall("bash", command="uv run bridgic-browser snapshot", description="Snapshot the current page")
     parts = []
     if tabs and tabs[0].result:
         parts.append(f"[Open tabs]\n{tabs[0].result}")

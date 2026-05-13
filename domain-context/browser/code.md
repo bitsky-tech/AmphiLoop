@@ -81,36 +81,56 @@ Condition-based waits use a text argument: `bridgic-browser wait "Submit"` waits
 
 **Mandate**: write an `observation` hook in every browser project that outputs the **same 3-section format** the explore wrapper (`browser-observe.sh`) produces — `=== ACTION ===` / `=== POST-ACTION TABS ===` / `=== POST-ACTION SNAPSHOT ===`. Saved artifacts (`.bridgic/explore/*.txt`) use the same format. VOLATILE resolvers (`H.find_X(observation)`) anchor on the section headers and work identically against both.
 
+**Plus a guarded `after_action` for post-wait refresh**: `observation` runs only *before* each yield in workflow, so helper code reading `ctx.observation` *between* yields (extracting a ref from the just-finished snapshot, deciding the next click target) would see pre-wait state. `after_action` re-fetches tabs + snapshot whenever the just-completed action was `bridgic-browser wait`, writing the same 3-section format into `ctx.observation`.
+
 ```python
 from pathlib import Path
-from bridgic.amphibious import ActionCall, RETURN
+from bridgic.amphibious import (
+    ActionCall, ActionResult, AmphibiousAutoma, RETURN,
+)
 
 
-async def observation(self, ctx):
-    tabs = yield ActionCall("bash", command="uv run bridgic-browser tabs", description="List open tabs")
-    snap = yield ActionCall("bash", command="uv run bridgic-browser snapshot", description="Snapshot current page")
+class Amphi(AmphibiousAutoma[AmphiContext]):
 
-    tabs_out = str(tabs[0].result) if tabs and tabs[0].result else ""
-    snap_out = str(snap[0].result) if snap and snap[0].result else ""
+    @staticmethod
+    def _format_observation(tabs_result, snap_result) -> str:
+        """3-section observation string with snapshot auto-resolve."""
+        tabs_out = str(tabs_result[0].result) if tabs_result and tabs_result[0].result else ""
+        snap_out = str(snap_result[0].result) if snap_result and snap_result[0].result else ""
+        # Auto-resolve: snapshot defaults to `-l 10000`; anything larger comes
+        # back as `[notice] saved to: <path>` — read the file inline.
+        if snap_out.startswith("[notice] saved to:"):
+            snap_out = Path(snap_out.split("[notice] saved to:", 1)[1].strip()).read_text()
+        return (
+            "=== ACTION ===\n\n"
+            f"=== POST-ACTION TABS ===\n{tabs_out}\n\n"
+            f"=== POST-ACTION SNAPSHOT ===\n{snap_out}"
+        )
 
-    # Auto-resolve: snapshot defaults to `-l 10000`; anything larger comes back
-    # as `[notice] saved to: <path>`. Read the file inline so parsers see the
-    # actual a11y tree.
-    if snap_out.startswith("[notice] saved to:"):
-        snap_path = snap_out.split("[notice] saved to:", 1)[1].strip()
-        snap_out = Path(snap_path).read_text()
+    async def observation(self, ctx):
+        tabs = yield ActionCall("bash", command="uv run bridgic-browser tabs", description="List open tabs")
+        snap = yield ActionCall("bash", command="uv run bridgic-browser snapshot", description="Snapshot current page")
+        yield RETURN(self._format_observation(tabs, snap))
 
-    # Periodic observation has no paired action; `=== ACTION ===` stays empty.
-    yield RETURN(
-        f"=== ACTION ===\n\n"
-        f"=== POST-ACTION TABS ===\n{tabs_out}\n\n"
-        f"=== POST-ACTION SNAPSHOT ===\n{snap_out}"
-    )
+    async def after_action(self, step_result, ctx):
+        action_result = step_result.result
+        if not isinstance(action_result, ActionResult):
+            return
+        for step in action_result.results:
+            if not (step.success and step.tool_name == "bash"):
+                continue
+            cmd = (step.tool_arguments or {}).get("command", "")
+            if "bridgic-browser wait" not in cmd:
+                continue
+            tabs = yield ActionCall("bash", command="uv run bridgic-browser tabs", description="List open tabs")
+            snap = yield ActionCall("bash", command="uv run bridgic-browser snapshot", description="Snapshot after wait")
+            ctx.observation = self._format_observation(tabs, snap)
+            return
 ```
 
-**Auto-resolve contract**: wrapper output (what the explore agent ingests into LLM context) stays unresolved; saved artifacts and runtime `observation` both resolve `[notice] saved to:` to the file content. See `domain-context/browser/explore.md` for the artifact-save rule.
+**Auto-resolve contract**: wrapper output (what the explore agent ingests into LLM context) stays unresolved; saved artifacts and `ctx.observation` at runtime (refreshed by either hook) all resolve `[notice] saved to:` to the file content. See `domain-context/browser/explore.md` for the artifact-save rule.
 
-`after_action` becomes **optional** — reach for it only when side-state needs to accumulate outside `ctx.observation` (dedup sets, per-step counters). Don't refresh `ctx.observation` from `after_action` — that's `observation`'s job.
+**Why the `wait` filter**: clicks / fills don't settle the DOM immediately — the workflow follows them with a `wait`. Refreshing only after `wait` captures stable state and avoids two extra browser calls per non-settling action. The framework no longer re-enters hooks from within hook dispatches (`ActionCall`s yielded inside `observation` / `before_action` / `after_action` are raw tool executions and skip the hook layer), so this is a selectivity filter, not a recursion guard.
 
 ---
 

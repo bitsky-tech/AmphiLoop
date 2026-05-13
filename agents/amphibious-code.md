@@ -307,28 +307,35 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
    yield ActionCall("bash", command=CMD_OPEN_CHATGPT, description="Open chatgpt.com")
    ```
 
-2. **One yield per operation-sequence step.** Numbered step in the report → one yield, in the same order. Sub-generators are only justified when the same sub-sequence repeats with parameter variation; a sub-generator called once is hide-and-seek — inline it.
+2. **One yield per operation-sequence step, all inlined in `on_workflow`.** Numbered step in the report → one yield, in the same order. **No sub-generators** — even when the same sub-sequence repeats across iterations, the loop body sits directly in `on_workflow`.
 
-   When a sub-generator IS justified, **it MUST be an `async def` returning an async generator that yields framework primitives, drained by the caller via `async for ... yield`. Regular `async def` methods that drive the environment through `await self.<private_subprocess_helper>(...)` are forbidden** — they build a shadow workflow the framework can't see, trace, or recover via `on_agent` fallback.
+   **Why no sub-generators**: `async for X in sub:` calls `sub.__anext__()` = `sub.asend(None)`, so it does NOT forward the framework's outer `.asend(value)` into the sub. Any `result = yield ActionCall(...)` inside a sub-generator silently receives `None`. (Manual `asend` delegation works but is uglier than inlining.) `async def` methods that bypass `ActionCall` via `await self.<private_subprocess_x>(...)` are equally forbidden — shadow workflow the framework can't see, trace, or recover via `on_agent` fallback.
 
    ```python
-   # ❌ Forbidden — regular async method that bypasses ActionCall via private subprocess wrappers
-   async def _generate_one_image(self, ctx, candidate):
-       await self._run_browser_cmd(CMD_OPEN_HOME, wait_s=3)
-       await self._run_browser_cmd(CMD_CLICK_GENERATE, wait_s=2)
-       snap = await self._take_snapshot_via_subprocess()
-       ...
-
-   # ✅ Required — async generator yielding primitives; caller drains via `async for ... yield`
-   async def _generate_one_image(self, ctx, candidate):
-       yield ActionCall("bash", command=CMD_OPEN_HOME, description="Open chatgpt home")
-       yield ActionCall("bash", command=CMD_CLICK_GENERATE, description="Enter image generation mode")
-       ...
+   # ❌ Forbidden — sub-generator drained by `async for`
+   async def _per_candidate(self, ctx, candidate):
+       snap = yield ActionCall("bash", command=H.CMD_SNAPSHOT, description="Refresh snapshot")
+       ref = H.find_button_ref(snap[0].result)   # snap is None — silent breakage
+       yield ActionCall("bash", command=f"...click @{ref}...", description="...")
 
    async def on_workflow(self, ctx):
        for candidate in ctx.candidates:
-           async for primitive in self._generate_one_image(ctx, candidate):
+           async for primitive in self._per_candidate(ctx, candidate):
                yield primitive
+
+   # ❌ Forbidden — async method bypassing ActionCall via private subprocess wrappers
+   async def _per_candidate(self, ctx, candidate):
+       await self._run_browser_cmd(H.CMD_OPEN_HOME, wait_s=3)
+       ...
+
+   # ✅ Required — inline the loop body in on_workflow
+   async def on_workflow(self, ctx):
+       for candidate in ctx.candidates:
+           yield ActionCall("bash", command=H.CMD_OPEN_HOME, description=f"Open fresh chat for slot {candidate.position}")
+           snap = yield ActionCall("bash", command=H.CMD_SNAPSHOT, description="Refresh snapshot")
+           ref = H.find_button_ref(snap[0].result)
+           yield ActionCall("bash", command=f"...click @{ref}...", description="...")
+           ...
    ```
 
 3. **STABLE refs live in `helpers.py` as constants; VOLATILE refs go through `helpers.py` parsers** (Principle #3).
@@ -508,25 +515,16 @@ class TodoCollector(AmphibiousAutoma[TodoCollectorContext]):
             selection = yield LLMCall.structure_output(build_select_prompt(ctx.candidate_paths, user_feedback=reply), constraint=PydanticModel(model=TodoSelection))
             ctx.selected_paths = selection.paths
 
-        # Step 4: per-file extraction — same sub-sequence per path → sub-generator.
+        # Step 4: per-file extraction — inlined; no sub-generators (see §2.6 #2).
         for path in ctx.selected_paths:
-            async for primitive in self._collect_todos_from(path, ctx):
-                yield primitive
+            grep = yield ActionCall("grep", pattern="TODO", path=path, description=f"Grep TODO lines from {path}")
+            lines = grep[0].result or []
+            if lines:
+                ctx.collected += f"\n## {path}\n" + "\n".join(lines) + "\n"
 
         # Step 5: write the accumulated blocks once at the end.
         yield ActionCall("bash", command=f"cat > {str(H.OUTPUT_PATH)!r} <<'__END__'\n{ctx.collected}\n__END__", description="Write all TODO blocks to result/todos.md")
         yield RETURN(str(H.OUTPUT_PATH))
-
-    async def _collect_todos_from(self, path: str, ctx):
-        """Sub-generator. SHAPE: `async def` returning an async generator that
-        yields framework primitives — NOT an async method that awaits private
-        subprocess helpers. Mutates ctx freely, same as on_workflow.
-        """
-        grep = yield ActionCall("grep", pattern="TODO", path=path, description=f"Grep TODO lines from {path}")
-        lines = grep[0].result or []
-        if not lines:
-            return
-        ctx.collected += f"\n## {path}\n" + "\n".join(lines) + "\n"
 ```
 
 **`helpers.py`:**
@@ -565,8 +563,8 @@ def build_select_prompt(candidate_paths: list[str], user_feedback: str | None = 
 
 **Reading guide — patterns to absorb:**
 
-- **`on_workflow` is the workflow.** 5 numbered comments → 5 top-level yield points (steps 1, 2, 3-loop, 4-sub-generator drain, 5). Every environment-touching line is `yield ActionCall(...)`. (§2.6 #1, #2)
-- **Sub-generator SHAPE.** `_collect_todos_from` is `async def` returning an async generator that yields `ActionCall`. The caller drains via `async for primitive in self._collect_todos_from(path, ctx): yield primitive`. **Zero `await self._x_via_subprocess(...)` escape hatches.** (§2.6 #2)
+- **`on_workflow` is the workflow.** 5 numbered comments → top-level yields all inside `on_workflow` (ActionCall / LLMCall / HumanCall as needed). (§2.6 #1, #2)
+- **All flow inlined.** Step 4's per-path grep loop sits in `on_workflow` directly. **No sub-generators** — `async for primitive in sub: yield primitive` breaks asend forwarding (sub's `x = yield ActionCall(...)` gets None). (§2.6 #2)
 - **LLM via `LLMCall`.** Structured output uses `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=TodoSelection))`. No `self.llm.astructured_output(...)` anywhere in the class. (§2.6 #7)
 - **`helpers.py` = execution-parameters module.** Two STABLE constants (`NOTES_GLOB_PATTERN` / `OUTPUT_PATH`); zero VOLATILE resolvers (this task has no per-run-resolved values — a browser task would have both buckets). **No CLI builders, no assembly logic** — per-yield-varying parameters are inline f-strings at the yield site (step 5's bash command). (§2.4)
 - **Import convention**: `import helpers as H` → `H.NOTES_GLOB_PATTERN` / `H.OUTPUT_PATH`. **Never** `from helpers import (a, b, c, …)` multi-symbol blocks. (§2.4)

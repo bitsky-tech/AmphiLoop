@@ -351,9 +351,24 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
    yield ActionCall("click_element_by_ref", ref=SEARCH_BUTTON_REF, description="Click Search to submit")
    ```
 
-4. **Recurring CLI commands → module constants in `helpers.py`** (e.g. `CMD_OPEN_HOME = f"uv run bridgic-browser open {URL}"`). One named constant beats re-typing the same f-string at multiple yield sites.
+4. **Recurring CLI commands → module constants in `helpers.py`** (e.g. `CMD_OPEN_HOME = f"uv run bridgic-browser open '{URL}'"`). One named constant beats re-typing the same f-string at multiple yield sites.
 
-5. **Pick the right yield primitive — prefer `ActionCall`.**
+5. **Shell-quote interpolated values in `bash` commands.** Bash treats unquoted `&` as a background-process operator, splits on whitespace, expands `$VAR` / backticks. Any non-constant value spliced into `command=` (URLs with query strings, LLM-generated text, user input, paths with spaces) must be quoted; refs / hex / numbers stay inline. **Known-safe content** → single-quote `'{VALUE}'`. **Unknown content** (anything that may contain `'`) → `shlex.quote(...)` (stdlib, no install; handles embedded `'` via POSIX `'\''`).
+
+   ```python
+   import shlex
+
+   # ❌ Forbidden — `&` is parsed as background-process operator; URL truncates
+   yield ActionCall("bash", command=f"curl {API_URL}?key={token}&fmt=json", description="Fetch API page")
+
+   # ✅ Known-safe → single-quote
+   yield ActionCall("bash", command=f"curl '{API_URL}?key={token}&fmt=json'", description="Fetch API page")
+
+   # ✅ Unknown content → shlex.quote
+   yield ActionCall("bash", command=f"grep -F {shlex.quote(pattern)} {shlex.quote(path)}", description="Grep file")
+   ```
+
+6. **Pick the right yield primitive — prefer `ActionCall`.**
 
    ```python
    yield ActionCall("save_record", **row, description="Persist row to DB")
@@ -366,9 +381,9 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
 
    `EnterAgent` is a **mode-switch signal**: workflow suspends, `on_agent` runs until exhausted, control resumes at the next yield. Use it when the sub-task needs **agent capability** — a tool-using OTC loop that reacts to dynamic state. For pure single-shot LLM reasoning over given inputs, prefer `LLMCall` — `EnterAgent` is over-kill. **Only valid in `amphiflow` mode.** `LLMCall.chat` returns `str`, `.structure_output(constraint=PydanticModel(model=Schema))` returns a Pydantic instance, `.tool_selector(...)` returns tool calls. `RETURN(value)` replaces `return value` (forbidden in async generators).
 
-6. **Built-in tools** — `bash`, `read_file`, `write_file`, `edit_file`, `glob`, `grep` are auto-injected; yield them by name. `write_file` / `edit_file` require a prior `read_file` on the same path.
+7. **Built-in tools** — `bash`, `read_file`, `write_file`, `edit_file`, `glob`, `grep` are auto-injected; yield them by name. `write_file` / `edit_file` require a prior `read_file` on the same path.
 
-7. **No `self.llm.<method>(...)` calls inside the agent class.** All LLM invocations go through `yield LLMCall.chat(...)` / `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=Schema))` / `yield LLMCall.tool_selector(...)`. Wrappers like `await self.llm.astructured_output(...)` are **forbidden** — they bypass the cognitive context, tracing, observation hooks, and per-step recoverability. Applies inside sub-generators too (per point 2's shape).
+8. **No `self.llm.<method>(...)` calls inside the agent class.** All LLM invocations go through `yield LLMCall.chat(...)` / `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=Schema))` / `yield LLMCall.tool_selector(...)`. Wrappers like `await self.llm.astructured_output(...)` are **forbidden** — they bypass the cognitive context, tracing, observation hooks, and per-step recoverability. Applies inside sub-generators too (per point 2's shape).
 
    ```python
    # ❌ Forbidden — wrapper bypassing LLMCall via direct llm access
@@ -527,45 +542,13 @@ class TodoCollector(AmphibiousAutoma[TodoCollectorContext]):
         yield RETURN(str(H.OUTPUT_PATH))
 ```
 
-**`helpers.py`:**
-
-```python
-from pathlib import Path
-
-# === Tunables / recurring constants ===
-NOTES_GLOB_PATTERN = "~/notes/*.md"
-OUTPUT_PATH = Path(__file__).parent / "result" / "todos.md"
-```
-
-**`schemas.py`:**
-
-```python
-from pydantic import BaseModel, Field
-
-
-class TodoSelection(BaseModel):
-    paths: list[str] = Field(description="Paths of markdown files likely to contain TODO items.")
-```
-
-**`prompts.py`:**
-
-```python
-def build_select_prompt(candidate_paths: list[str], user_feedback: str | None = None) -> str:
-    base = (
-        "Given these markdown file paths, pick those whose name suggests they "
-        "contain TODO items (roadmap, plan, todo, action_items, …):\n\n"
-        + "\n".join(candidate_paths)
-    )
-    if user_feedback:
-        base += f"\n\nUser feedback on the previous selection: {user_feedback}\nRevise accordingly."
-    return base
-```
+(Sibling files `helpers.py` / `schemas.py` / `prompts.py` are trivial here — two STABLE constants, one Pydantic model, one `build_select_prompt(...)` function — and the §2.4 sibling-file rules already cover their shape. Omitted to keep the example focused on the `amphi.py` SHAPE.)
 
 **Reading guide — patterns to absorb:**
 
 - **`on_workflow` is the workflow.** 5 numbered comments → top-level yields all inside `on_workflow` (ActionCall / LLMCall / HumanCall as needed). (§2.6 #1, #2)
 - **All flow inlined.** Step 4's per-path grep loop sits in `on_workflow` directly. **No sub-generators** — `async for primitive in sub: yield primitive` breaks asend forwarding (sub's `x = yield ActionCall(...)` gets None). (§2.6 #2)
-- **LLM via `LLMCall`.** Structured output uses `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=TodoSelection))`. No `self.llm.astructured_output(...)` anywhere in the class. (§2.6 #7)
+- **LLM via `LLMCall`.** Structured output uses `yield LLMCall.structure_output(prompt, constraint=PydanticModel(model=TodoSelection))`. No `self.llm.astructured_output(...)` anywhere in the class. (§2.6 #8)
 - **`helpers.py` = execution-parameters module.** Two STABLE constants (`NOTES_GLOB_PATTERN` / `OUTPUT_PATH`); zero VOLATILE resolvers (this task has no per-run-resolved values — a browser task would have both buckets). **No CLI builders, no assembly logic** — per-yield-varying parameters are inline f-strings at the yield site (step 5's bash command). (§2.4)
 - **Import convention**: `import helpers as H` → `H.NOTES_GLOB_PATTERN` / `H.OUTPUT_PATH`. **Never** `from helpers import (a, b, c, …)` multi-symbol blocks. (§2.4)
 

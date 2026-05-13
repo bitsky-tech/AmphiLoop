@@ -108,17 +108,13 @@ result = await agent.arun(
 grep -rnE "\byield\s+HumanCall\b|ActionCall\([\"']request_human[\"']" {generator_project}/
 ```
 
-Two patterns are checked: `yield HumanCall(...)` (the deterministic HITL primitive) and `yield ActionCall("request_human", ...)` (calling the auto-injected built-in tool directly from `on_workflow`). Bare `from bridgic.amphibious import HumanCall` import lines are not matched. No match → no static human-interaction touchpoint inside `on_workflow` → skip 1.2.
-
-(`on_agent`-side HITL — the LLM autonomously invoking `request_human` inside a `ThinkUnit` — is not statically detectable, but verify forces `RunMode.WORKFLOW` so `on_agent` does not run during verification.)
+Two patterns are checked: `yield HumanCall(...)` (the deterministic HITL primitive) and `yield ActionCall("request_human", ...)` (calling the auto-injected built-in tool directly from `on_workflow`). No match → skip 1.2.
 
 Register a verify-only `@human_channel`-decorated method on the agent class. It swaps the runtime handler to a file-based one driven by `monitor.sh` **without touching the existing human-input design** in the generated code.
 
-**Where to insert**: a method on the `AmphibiousAutoma` subclass — placed **after** any existing `@human_channel`-decorated method in `amphi.py` so class-body evaluation order makes the verify handler win.
+**Where to insert**: a method on the `AmphibiousAutoma` subclass, **after** any existing `@human_channel`-decorated method in `amphi.py` so class-body evaluation order makes the verify handler win.
 
-**Channel name**:
-- If `amphi.py` declares no `@human_channel`, decorate the verify method as `@human_channel("verify")` — it becomes the only channel and the implicit default.
-- If `amphi.py` already declares `@human_channel("X")`, decorate the verify method with the **same** name (`@human_channel("X")`) so production `yield HumanCall(prompt=...)` sites resolve to the verify handler with no edits at the call sites.
+**Channel name**: if `amphi.py` already declares `@human_channel("X")`, decorate the verify method with the same `@human_channel("X")` so production `yield HumanCall(prompt=...)` sites resolve here without edits at the call sites. Otherwise use `@human_channel("verify")` (it becomes the only channel and the implicit default).
 
 **Implementation pattern** (the module-level `human_channel` import goes in its own marker block so Phase 4 strips the import alongside the decorated method):
 
@@ -153,8 +149,6 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
         return response.get("response", "")
     # --- VERIFY_ONLY_END ---
 ```
-
-Channel handlers are **plain async methods returning `str`** — they receive `prompt` as a positional argument (no `data` dict, no generator yields).
 
 ### 1.3 Bound dynamic iteration
 
@@ -197,7 +191,7 @@ while not next_page_disabled(ctx.observation):
     # ... loop body, including the click that advances to the next page
 ```
 
-**Pattern C — list / generator comprehensions, `async for`**: rare in `on_workflow`. If they consume a runtime collection, refactor to an explicit `for` first, then apply Pattern A. Don't try to slice an `async for` inline.
+**Pattern C — comprehensions / `async for` over runtime collections** (rare): refactor to an explicit `for` first, then apply Pattern A.
 
 **Rules**:
 - Only bound the iterations identified above. **Do NOT** bound deterministic step sequences (stable-ref clicks, navigation chains, fixed-list iteration).
@@ -224,9 +218,9 @@ bash {PLUGIN_ROOT}/scripts/run/monitor.sh {generator_project} [TIMEOUT]
 | **2** | Human intervention required | Read the prompt from stdout, ask the user, write the answer to the `human_response` path printed in stdout as `{"response": "<user reply or 'done'>"}`, re-run `monitor.sh` |
 | **3** | Timeout | Report to user and investigate |
 
-Re-invoke `monitor.sh` with the **same arguments** to resume — it auto-detects the existing PID after human intervention, or starts fresh after a terminal exit. Every runtime artifact (`run.log`, `pid`, `human_request.json`, `human_response.json`) lives under `<PROJECT_ROOT>/.bridgic/verify/`; the script prints the resolved absolute paths on every exit, so the agent never has to guess.
+Re-invoke `monitor.sh` with the **same arguments** to resume. Runtime artifacts (`run.log`, `pid`, `human_request.json`, `human_response.json`) live under `<PROJECT_ROOT>/.bridgic/verify/`; the script prints the resolved absolute paths on every exit.
 
-When `monitor.sh` returns exit 3 (timeout), tighter §1.3 bounds are the lever — slice smaller, lower `_verify_max`, drop one pagination level. Stop-and-report is owned by Principle #2: same error after three fixes, or a structural pass that won't fit even with maximally tight bounds.
+When exit 3 (timeout), tighter §1.3 bounds are the lever — slice smaller, lower `_verify_max`, drop one pagination level. Stop-and-report conditions: Principle #2.
 
 ---
 
@@ -236,7 +230,7 @@ PASS requires all of:
 
 1. **Exit code 0** — the process exited cleanly.
 2. **No errors in the log** — grep `run.log` for `ERROR`, `Traceback`, `Exception`; there should be none.
-3. **Expected output produced** — the spec is `build_context.md → ## Task → file → expected_output`, optionally augmented by the domain-context file's expected-output indicators. Verify against the spec; the program's own success log messages are corroborating evidence at most (Principle #5).
+3. **Expected output produced** — verify against `build_context.md → ## Task → file → expected_output` (plus the domain-context file's expected-output indicators when present). See Principle #5.
 
 If any check fails: diagnose → fix → return to Phase 2.
 

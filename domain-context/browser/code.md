@@ -130,7 +130,7 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
 
 **Auto-resolve contract**: wrapper output (what the explore agent ingests into LLM context) stays unresolved; saved artifacts and `ctx.observation` at runtime (refreshed by either hook) all resolve `[notice] saved to:` to the file content. See `domain-context/browser/explore.md` for the artifact-save rule.
 
-**Why the `wait` filter**: clicks / fills don't settle the DOM immediately — the workflow follows them with a `wait`. Refreshing only after `wait` captures stable state and avoids two extra browser calls per non-settling action. The framework no longer re-enters hooks from within hook dispatches (`ActionCall`s yielded inside `observation` / `before_action` / `after_action` are raw tool executions and skip the hook layer), so this is a selectivity filter, not a recursion guard.
+**Why the `wait` filter**: clicks / fills don't settle the DOM immediately — the workflow follows them with a `wait`. Refreshing only after `wait` captures stable state and avoids two extra browser calls per non-settling action.
 
 ---
 

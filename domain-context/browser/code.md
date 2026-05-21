@@ -178,9 +178,10 @@ async def main():
 
     llm = None  # configure OpenAILlm here when llm_configured = yes; full pattern in amphibious-code.md §3.
 
-    agent = Amphi(llm=llm, verbose=True)
+    agent = Amphi(verbose=True)
     try:
         await agent.arun(
+            llm=llm,
             context=AmphiContext(goal=GOAL),
             tools=TASK_TOOLS,
             mode=RunMode.WORKFLOW,  # or RunMode.AMPHIFLOW

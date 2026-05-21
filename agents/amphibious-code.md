@@ -21,7 +21,7 @@ The methodology runs in four phases, in order:
 
 2. **Implement the project files** — fill the scaffolded `amphi.py` (Context + agent class), plus the named sibling files (`schemas.py` / `prompts.py` / `helpers.py` / `tools.py`) for content that emerges. `amphi.py` holds only Context + class; everything else has a designated sibling home.
 
-3. **Create `main.py`** — load `.env`, configure logging, instantiate the LLM (when `llm_configured = yes`), and call `agent.arun(...)` with the goal, tools, and explicit run mode.
+3. **Create `main.py`** — load `.env`, configure logging, instantiate the LLM (when `llm_configured = yes`), and call `agent.arun(...)` with the LLM, goal, tools, and explicit run mode.
 
 4. **Write `README.md`** — short, operational: goal, prerequisites, run command, outputs.
 
@@ -609,8 +609,9 @@ async def main():
     #     timeout=180.0,
     # )
 
-    agent = Amphi(llm=llm, verbose=True)
+    agent = Amphi(verbose=True)
     await agent.arun(
+        llm=llm,
         context=AmphiContext(goal=GOAL),
         tools=[],  # or TASK_TOOLS when tools.py exists
         mode=RunMode.WORKFLOW,  # or RunMode.AMPHIFLOW per build_context.md

@@ -93,14 +93,19 @@ from bridgic.amphibious import (
 class Amphi(AmphibiousAutoma[AmphiContext]):
 
     @staticmethod
+    def _resolve_snapshot(snap_out: str) -> str:
+        """Read the snapshot file when the CLI saved a large snapshot to disk."""
+        for line in snap_out.splitlines():
+            if line.startswith("[notice]") and "saved to:" in line:
+                return Path(line.split("saved to:", 1)[1].strip()).read_text()
+        return snap_out
+
+    @staticmethod
     def _format_observation(tabs_result, snap_result) -> str:
         """3-section observation string with snapshot auto-resolve."""
         tabs_out = str(tabs_result[0].result) if tabs_result and tabs_result[0].result else ""
         snap_out = str(snap_result[0].result) if snap_result and snap_result[0].result else ""
-        # Auto-resolve: snapshot defaults to `-l 10000`; anything larger comes
-        # back as `[notice] saved to: <path>` — read the file inline.
-        if snap_out.startswith("[notice] saved to:"):
-            snap_out = Path(snap_out.split("[notice] saved to:", 1)[1].strip()).read_text()
+        snap_out = Amphi._resolve_snapshot(snap_out)
         return (
             "=== ACTION ===\n\n"
             f"=== POST-ACTION TABS ===\n{tabs_out}\n\n"
@@ -128,7 +133,7 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
             return
 ```
 
-**Auto-resolve contract**: wrapper output (what the explore agent ingests into LLM context) stays unresolved; saved artifacts and `ctx.observation` at runtime (refreshed by either hook) all resolve `[notice] saved to:` to the file content. See `domain-context/browser/explore.md` for the artifact-save rule.
+**Auto-resolve contract**: wrapper output (what the explore agent ingests into LLM context) stays unresolved; saved artifacts and `ctx.observation` at runtime (refreshed by either hook) all resolve the snapshot's `[notice] ... saved to: <path>` line to the file content. See `domain-context/browser/explore.md` for the artifact-save rule.
 
 **Why the `wait` filter**: clicks / fills don't settle the DOM immediately — the workflow follows them with a `wait`. Refreshing only after `wait` captures stable state and avoids two extra browser calls per non-settling action.
 

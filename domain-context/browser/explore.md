@@ -65,7 +65,7 @@ Pick the call form by **command kind**:
 1. **The wrapper REFUSES `snapshot`, `tabs`, `close`** — they are not actions; wrapping self-includes or runs on a dead browser. `bash browser-observe.sh -- tabs` fails with `refusing to wrap '<cmd>'` and burns a turn. Always call them via `uv run bridgic-browser <cmd>` directly.
 2. **Do not re-fetch `snapshot` / `tabs` after each action** — the wrapper already printed both. Re-fetching is the most common waste pattern. Direct calls are reserved for genuinely insufficient wrapper output (snapshot truncated, late render, tab-focus confirmation).
 
-Snapshot output is either inline (minimal) or a file path (substantial — grep or read it). The wrapper output you ingest stays unresolved — substantial pages inlined per turn would blow exploration context. **At artifact-save time**, resolve any `[notice] saved to: <path>` in the snapshot section to the file content so the saved artifact has the full a11y tree inline — same format production `observation` emits (`domain-context/browser/code.md` §2.7).
+Snapshot output is either inline (minimal) or a file path (substantial — grep or read it). The wrapper output you ingest stays unresolved — substantial pages inlined per turn would blow exploration context. **At artifact-save time**, resolve any `[notice] ... saved to: <path>` notice in the snapshot section to the file content so the saved artifact has the full a11y tree inline — same format production `observation` emits (`domain-context/browser/code.md` §2.7).
 
 ## Ref classification — STABLE vs VOLATILE
 

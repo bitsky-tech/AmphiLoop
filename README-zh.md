@@ -84,6 +84,7 @@ Agents 是由 commands 调度的执行专家，不由用户直接调用：
 
 | Agent | 功能 |
 |-------|------|
+| **amphibious-config** | 配置构建流水线：项目模式、LLM、领域设置；执行环境搭建；写出供后续各阶段读取的 build_context.md |
 | **amphibious-explore** | 通过领域工具集系统性探索目标环境，生成带稳定性标注的可执行操作序列与关键快照 |
 | **amphibious-code** | 根据任务描述和探索报告生成完整的 bridgic-amphibious 项目 |
 | **amphibious-verify** | 注入调试插桩、监控运行、验证结果、清理环境 |
@@ -121,7 +122,7 @@ AmphiLoop/
 ├── domain-context/              # /build 注入的预蒸馏领域上下文
 │   └── browser/                 #   intent.md / config.md / explore.md / code.md / verify.md（含 script/）
 ├── templates/                   # 命令使用的静态模板（不会被自动扫描）
-│   └── build-task-template.md         #   /build 使用的统一 TASK.md 模板
+│   └── build-task-template.md   #   /build 使用的统一 TASK.md 模板
 ├── hooks/                       # 自动加载的事件处理器
 │   └── hooks.json
 └── scripts/                     # Hook 与工具脚本

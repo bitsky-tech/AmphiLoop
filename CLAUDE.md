@@ -46,7 +46,7 @@ AmphiLoop/
 | Type | Purpose | Example |
 |------|---------|---------|
 | **Skill** | Domain knowledge reference — loaded on-demand by agents; synced from source repos via `manifest.ini` | bridgic-browser, bridgic-amphibious, bridgic-llms |
-| **Agent** | Deep execution methodology — delegated by commands | amphibious-explore, amphibious-code, amphibious-verify |
+| **Agent** | Deep execution methodology — delegated by commands | amphibious-config, amphibious-explore, amphibious-code, amphibious-verify |
 | **Command** | Multi-step orchestrator invoked by user | /build |
 | **Domain Context** | Pre-distilled per-domain rules (`intent.md`, `config.md`, `explore.md`, `code.md`, `verify.md`) injected by `/build` when a domain is selected explicitly via `--<domain>` or auto-detected from `TASK.md` | domain-context/browser |
 
@@ -70,6 +70,7 @@ claude plugin install AmphiLoop
 
 | Agent | When to Use |
 |-------|-------------|
+| **amphibious-config** | Configure the build pipeline — project mode, LLM, domain settings — run environment setup, and write the build_context.md every later phase reads |
 | **amphibious-explore** | Systematically explore a target environment via a domain toolset, produce an executable plan with stability-annotated operations |
 | **amphibious-code** | Generate a complete bridgic-amphibious project from a task description with optional domain context |
 | **amphibious-verify** | Verify a generated amphibious project: inject debug instrumentation, run with monitoring, validate results, clean up |

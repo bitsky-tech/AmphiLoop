@@ -83,6 +83,7 @@ Agents are execution specialists delegated by commands. They are not called dire
 
 | Agent | What It Does |
 |-------|-------------|
+| **amphibious-config** | Configures the build pipeline — project mode, LLM, and domain settings — runs environment setup, and writes the build_context.md every later phase reads |
 | **amphibious-explore** | Systematically explores a target environment via a domain-supplied toolset, produces an executable plan with stability-annotated operations and supporting snapshots |
 | **amphibious-code** | Generates a complete bridgic-amphibious project from a task description and exploration report |
 | **amphibious-verify** | Injects debug instrumentation, runs the project with monitoring, validates results, and cleans up |
@@ -120,7 +121,7 @@ AmphiLoop/
 ├── domain-context/              # Pre-distilled per-domain context injected by /build
 │   └── browser/                 #   intent.md, config.md, explore.md, code.md, verify.md (+ script/)
 ├── templates/                   # Static templates read by commands (not auto-scanned)
-│   └── build-task-template.md         #   Unified TASK.md template used by /build
+│   └── build-task-template.md   #   Unified TASK.md template used by /build
 ├── hooks/                       # Auto-loaded event handlers
 │   └── hooks.json
 └── scripts/                     # Hook & utility implementations

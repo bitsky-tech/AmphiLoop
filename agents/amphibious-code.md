@@ -159,10 +159,12 @@ Everything else is a **helper** — called as plain Python (`helper(...)` / `awa
 
 Read `build_context.md → ## Pipeline → mode`:
 
-| Mode | Override `on_workflow` | Override `on_agent` | LLM required |
-|---|:-:|:-:|:-:|
-| `workflow` | yes | omit | no |
-| `amphiflow` | yes | yes | yes |
+| Mode | Override `on_workflow` | Override `on_agent` |
+|---|:-:|:-:|
+| `workflow` | yes | omit |
+| `amphiflow` | yes | yes |
+
+AI requirement is **independent of mode** — see `build_context.md → ## Pipeline → llm_configured` / `agent_configured`. Workflow-mode projects may still use AI via `EnterAgent` / `LLMCall`; amphiflow-mode projects need at least one AI kind for `on_agent` to do useful work.
 
 Pass the chosen mode explicitly to `main.py`'s `arun(...)` — never rely on `RunMode.AUTO`.
 
@@ -400,7 +402,7 @@ An async generator that yields framework primitives — `ActionCall`, `EnterAgen
 
 ### 2.7 `amphi.py`: `on_agent`
 
-Declare `think_unit`s as class attributes; invoke them via `yield ThinkUnit("name")`. Each `think_unit` wraps a `CognitiveWorker` running an OTC loop until completion or `max_attempts` exhausts.
+Declare cognitive descriptors as class attributes — `think_unit(CognitiveWorker.inline(...))` wraps an in-process LLM OTC loop, `think_agent(AgentWorker(ClaudeCodeAgent(...)))` wraps one delegated cycle to an external coding-agent CLI (when `agent_configured != none`). Invoke via `yield ThinkUnit("name")` or `yield ThinkAgent("name", goal=...)`. Each `think_unit` runs until completion or `max_attempts` exhausts; each `ThinkAgent` yield is exactly one delegated cycle.
 
 ```python
 from bridgic.amphibious import CognitiveWorker, think_unit, ThinkUnit
@@ -420,6 +422,28 @@ class Amphi(AmphibiousAutoma[AmphiContext]):
 - **`max_attempts`**: 3–5 for narrow recovery, up to 10 for open-ended exploration.
 - **Conditional looping** — `until=...` (with optional `max_attempts=...`, `tools=[...]`) overlay: `yield ThinkUnit("researcher", until=lambda ctx: len(ctx.cognitive_history) >= 3)`.
 - **Restrict per-phase toolset** with `think_unit(tools=[...])`. The class attribute `builtin_tools = frozenset({...})` is the project-wide equivalent.
+
+**External agent — `think_agent` / `ThinkAgent`** (when `agent_configured != none` in `build_context.md`).
+
+```python
+from bridgic.amphibious import (
+    AgentWorker, ClaudeCodeAgent, ThinkAgent, think_agent,
+)
+
+
+class Amphi(AmphibiousAutoma[AmphiContext]):
+    delegate = think_agent(
+        AgentWorker(ClaudeCodeAgent(completion_timeout=300.0)),
+    )
+
+    async def on_agent(self, ctx):
+        result = yield ThinkAgent("delegate", goal="Recover from the failed step.")
+```
+
+- **Driver follows `agent_configured`**: `claude_code` → `ClaudeCodeAgent`; `codex` → `CodexAgent` (`from bridgic.amphibious import CodexAgent`). Same `AgentWorker` wrapper either way.
+- **Tool calls from the external CLI** flow back through the parent's `before_action` / `after_action` hooks via an in-process MCP bridge, and land in the trace.
+- **No `arun(llm=)` required** when `agent_configured != none` and `llm_configured = no` — the external agent brings its own LLM.
+- **`ThinkUnit` vs `ThinkAgent`**: cheap per-step reasoning → `ThinkUnit` (when `llm_configured = yes`); substantial code/file work that benefits from a coding-agent's strengths → `ThinkAgent` (when `agent_configured != none`). The Phase 2 AI configuration picks at most one — projects don't mix the two.
 
 ### 2.8 `amphi.py`: Hooks
 
@@ -625,6 +649,7 @@ if __name__ == "__main__":
 - **Args parsing only when the task requires runtime parameters.** Don't add `argparse` for its own sake.
 - **Goal & context**: hardcode the task description as a module-level `GOAL` constant (triple-quoted for multi-line), and pass it via `context=AmphiContext(goal=GOAL)` — explicit context construction works regardless of how the framework infers the parameterized context type, and gives a clear hook to pre-populate any custom `AmphiContext` field at startup.
 - **LLM block conditional on `llm_configured`.** When `no`, pass `llm=None` and omit the imports — explicit beats implicit. When `yes`, instantiate `OpenAILlm` from env vars (loaded by `load_dotenv()`); read `bridgic-llms/SKILL.md` for the provider's exact signature.
+- **Agent (when `agent_configured != none`) is wired in `amphi.py`, NOT `main.py`.** The external agent is instantiated inside a `think_agent(AgentWorker(...))` descriptor on the agent class (see §2.7) — `main.py` needs no agent-specific code. The CLI (`claude` or `codex`) must be on `PATH` and authenticated on the runtime host.
 - **Tool assembly**: when `tools.py` exists, `from tools import TASK_TOOLS` and pass `tools=TASK_TOOLS`; otherwise pass `tools=[]` inline. The framework auto-injects the built-ins (bash / read_file / write_file / edit_file / glob / grep / request_human) on top, so `tools=` only carries the custom task tools.
 - **Mode**: pass `mode=RunMode.WORKFLOW` or `mode=RunMode.AMPHIFLOW` explicitly per `build_context.md → ## Pipeline → mode`.
 - **`result/` and `log/` resolve to `Path(__file__).parent / "..."`** (inside the generator project), NOT `Path(__file__).parent.parent / "..."` (PROJECT_ROOT).

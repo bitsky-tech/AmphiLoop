@@ -71,7 +71,7 @@ Without a flag, `/build` auto-detects the domain from `TASK.md` (and falls back 
 **What happens under the hood:**
 
 1. **Initialize Task** — Writes a `TASK.md` template where you fill in goal, expected output, and **Domain References**; auto-detects the domain if no flag was given
-2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow), LLM config if needed, plus any domain-specific configuration (e.g. browser environment mode when `--browser` is active)
+2. **Configure Pipeline** — Project mode (Workflow vs Amphiflow), AI config if needed (LLM, or an external coding-agent CLI you've installed yourself), plus any domain-specific configuration (e.g. browser environment mode when `--browser` is active)
 3. **Setup Environment** — Checks `uv`, runs `uv init`
 4. **Explore** — Delegates to `amphibious-explore` agent, which reads your domain references and probes the environment
 5. **Generate** — Delegates to `amphibious-code` agent to produce a complete project with all source files
@@ -129,7 +129,8 @@ AmphiLoop/
     │   └── inject-command-paths.sh
     ├── run/
     │   ├── setup-env.sh         #   Verify uv toolchain; uv init --bare in PROJECT_ROOT
-    │   ├── check-dotenv.sh      #   LLM configuration validation
+    │   ├── check-dotenv.sh      #   LLM .env validation
+    │   ├── detect-agents.sh     #   Scan for installed coding-agent CLIs
     │   └── monitor.sh           #   Run-and-monitor for amphibious-verify
     └── maintenance/
         └── sync-skills.sh       #   Sync skills from source repos via manifest.ini

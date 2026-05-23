@@ -87,7 +87,7 @@ After this step `SELECTED_DOMAIN` is either a valid domain name or unresolved (g
 The methodology document covers, in this order:
 
 1. Project Mode (Workflow | Amphiflow)
-2. LLM Configuration (`check-dotenv.sh`)
+2. AI Configuration (at most one of LLM, or a user-installed coding-agent CLI — via `check-dotenv.sh` / `detect-agents.sh`)
 3. Domain-specific Configuration (`domain-context/<domain>/config.md`, if any)
 4. Environment Setup (`setup-env.sh` — verifies the `uv` toolchain and runs `uv init --bare` in `PROJECT_ROOT` so later phases share one uv env)
 5. Write `{PROJECT_ROOT}/.bridgic/build_context.md` (the single source of truth for Phases 3–5)
@@ -108,7 +108,7 @@ Do not start Phase 4 until exploration is complete — the report and artifact f
 
 ## Phase 4: Generate Amphibious Code
 
-Delegate to the **`amphibious-code`** subagent, passing `build_context_path` and `domain_context_path` per the Phase context contract above. The agent reads `## Pipeline → mode` and `llm_configured` from `build_context.md` and applies its own mode-/LLM-mapping rules.
+Delegate to the **`amphibious-code`** subagent, passing `build_context_path` and `domain_context_path` per the Phase context contract above. The agent reads `## Pipeline → mode`, `llm_configured`, and `agent_configured` from `build_context.md` and applies its own mode + AI-mapping rules.
 
 After the agent returns, fill `## Outputs → generator_project` (the `<PROJECT_ROOT>/<project-name>/` subdirectory the agent created and populated) in `build_context.md`.
 

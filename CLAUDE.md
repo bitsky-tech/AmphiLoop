@@ -35,7 +35,8 @@ AmphiLoop/
     │   └── inject-command-paths.sh     ← injects PLUGIN_ROOT + PROJECT_ROOT when a bridgic command loads
     ├── run/                           ← runtime scripts used by agents
     │   ├── setup-env.sh               ← verify uv toolchain (auto-installs if missing) and run `uv init --bare` in PROJECT_ROOT
-    │   ├── check-dotenv.sh            ← .env LLM configuration validation
+    │   ├── check-dotenv.sh            ← .env LLM validation
+    │   ├── detect-agents.sh           ← scan for installed coding-agent CLIs
     │   └── monitor.sh                 ← run-and-monitor for amphibious-verify agent
     └── maintenance/                   ← plugin maintenance scripts (manual)
         └── sync-skills.sh             ← sync skills from source repos via manifest.ini

@@ -72,7 +72,7 @@ Commands 是用户可直接调用的工作流，使用 `/` 前缀触发：
 **执行流程：**
 
 1. **Initialize Task** — 生成 `TASK.md` 模板，用户填写目标、预期输出、**领域参考**；若未带标志则自动识别领域
-2. **Configure Pipeline** — 项目模式（Workflow / Amphiflow）、按需的 LLM 配置，以及任何领域特定配置（例如 `--browser` 模式下询问浏览器环境模式）
+2. **Configure Pipeline** — 项目模式（Workflow / Amphiflow）、按需的 AI 配置（LLM 或你自己已安装的外部 coding-agent CLI），以及任何领域特定配置（例如 `--browser` 模式下询问浏览器环境模式）
 3. **Setup Environment** — 检查 `uv`，执行 `uv init`
 4. **Explore** — 委派 `amphibious-explore` agent 读取用户提供的领域参考并探索环境
 5. **Generate** — 委派 `amphibious-code` agent 生成完整项目及所有源文件
@@ -130,7 +130,8 @@ AmphiLoop/
     │   └── inject-command-paths.sh
     ├── run/
     │   ├── setup-env.sh         #   校验 uv 工具链；在 PROJECT_ROOT 执行 uv init --bare
-    │   ├── check-dotenv.sh      #   LLM 模型配置校验
+    │   ├── check-dotenv.sh      #   LLM .env 校验
+    │   ├── detect-agents.sh     #   扫描已安装的 coding-agent CLI
     │   └── monitor.sh           #   amphibious-verify 的 run-and-monitor 脚本
     └── maintenance/
         └── sync-skills.sh       #   从源仓库同步 skills（基于 manifest.ini）
